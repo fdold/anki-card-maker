@@ -1,4 +1,7 @@
 .venv/
+venv/
+env/
+ENV/
 __pycache__/
 .pytest_cache/
 .mypy_cache/
@@ -8,7 +11,7 @@ __pycache__/
 *.pyd
 .DS_Store
 .env
+*.egg-info/
 dist/
 build/
 htmlcov/
-

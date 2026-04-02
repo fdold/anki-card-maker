@@ -1,18 +1,18 @@
 # anki-card-maker
 
-Modulare Python-Anwendung zur Umwandlung von Dokumenten in Anki-kompatible Lernkarten.
+Modular Python application for turning documents into Anki-compatible flashcards.
 
-## Projektstruktur
+## Project Structure
 
-- `frontend/` UI-Platzhalter fuer spaetere Review- und Plugin-Auswahl
-- `backend/` API, Services, Pipeline, Parser, Exporter, Storage, Model-Integrationen
-- `domain/` gemeinsame Pydantic-Domain-Modelle
-- `plugins/` Workflow- und Helper-Plugins
-- `tests/` Unit-, Integrations-, API- und E2E-Tests
+- `frontend/` UI placeholder for later review and plugin selection
+- `backend/` API, services, pipeline, parsers, exporters, storage, model integrations
+- `domain/` shared Pydantic domain models
+- `plugins/` workflow and helper plugins
+- `tests/` unit, integration, API, and E2E tests
 - `docker/` Dockerfiles
-- `docs/` Architektur- und Plugin-Dokumentation
+- `docs/` architecture and plugin documentation
 
-## Schnellstart
+## Quick Start
 
 ```bash
 docker compose up --build
@@ -23,13 +23,13 @@ API-Endpunkte:
 - `GET /health`
 - `GET /overview`
 
-## Entwicklungsstand
+## Current Status
 
-Das Repository enthaelt jetzt ein sauberes Grundgeruest mit:
+The repository now contains a clean initial foundation with:
 
-- FastAPI-Startpunkt
-- zentralen Domain-Modellen
-- TXT-Parser als erste stabile Eingabeform
-- erstem Workflow-Plugin-Grundgeruest
-- CSV-Exporter fuer fruehe Anki-Kompatibilitaet
-- Basis-Tests fuer Parser, Workflow und Export
+- FastAPI entry point
+- centralized domain models
+- TXT parser as the first stable input format
+- first workflow plugin scaffold
+- CSV exporter for early Anki compatibility
+- baseline tests for parser, workflow, and export
