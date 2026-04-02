@@ -1,21 +1,28 @@
-from domain.models import CardCandidate, ParsedContent, PluginManifest, WorkflowPluginConfig
+from pydantic import BaseModel, Field
+
+from domain.models import CardCandidate, ParsedContent, PluginManifest
 from plugins.base import WorkflowPlugin
 
 
-class BasicTextWorkflowPlugin(WorkflowPlugin):
-    manifest = PluginManifest(
+class BasicTextWorkflowConfig(BaseModel):
+    max_cards: int = Field(default=20, ge=1, le=500)
+    card_style: str = Field(default="basic")
+
+
+class BasicTextWorkflowPlugin(WorkflowPlugin[BasicTextWorkflowConfig]):
+    config_model = BasicTextWorkflowConfig
+    base_manifest = PluginManifest(
         plugin_id="basic_text_workflow",
         name="Basic Text Workflow",
         plugin_type="workflow",
         description="Minimal starter workflow for TXT inputs and basic cards.",
         supported_input_types=["txt"],
-        config_schema=WorkflowPluginConfig.model_json_schema(),
     )
 
     def generate_cards(
         self,
         parsed_content: ParsedContent,
-        config: WorkflowPluginConfig,
+        config: BasicTextWorkflowConfig,
     ) -> list[CardCandidate]:
         cards: list[CardCandidate] = []
         for block in parsed_content.blocks[: config.max_cards]:
@@ -31,4 +38,3 @@ class BasicTextWorkflowPlugin(WorkflowPlugin):
                 )
             )
         return cards
-

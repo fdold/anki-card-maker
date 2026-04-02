@@ -9,7 +9,6 @@ from domain.models import (
     PluginManifest,
     SourceReference,
     TextBlock,
-    WorkflowPluginConfig,
 )
 
 __all__ = [
@@ -21,6 +20,4 @@ __all__ = [
     "PluginManifest",
     "SourceReference",
     "TextBlock",
-    "WorkflowPluginConfig",
 ]
-

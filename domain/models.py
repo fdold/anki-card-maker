@@ -26,11 +26,6 @@ class ParsedContent(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class WorkflowPluginConfig(BaseModel):
-    max_cards: int = Field(default=20, ge=1, le=500)
-    card_style: str = Field(default="basic")
-
-
 class PluginManifest(BaseModel):
     plugin_id: str
     name: str
@@ -60,4 +55,3 @@ class GenerationRun(BaseModel):
     document_id: str
     cards: list[CardCandidate] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
-

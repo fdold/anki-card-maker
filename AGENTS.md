@@ -182,6 +182,9 @@ Rules:
 - Exactly **one active workflow plugin** is selected per card-generation run.
 - Workflow plugins must be user-selectable in the interface.
 - Workflow plugin configuration must be explicit, structured, and validatable.
+- Each workflow plugin must define and own its **own configuration model/schema**.
+- Do **not** introduce a central shared workflow-plugin config that all plugins are forced to use.
+- General application code may expose or validate a selected plugin's schema, but the config fields themselves belong to that plugin.
 - Workflow plugins must not bypass domain models.
 - Workflow plugins must not rely on hidden global state.
 - Workflow plugins must not scatter prompt logic into general application code.
