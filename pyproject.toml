@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anki-card-maker"
+version = "0.1.0"
+description = "Modular document-to-Anki flashcard generator."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "pydantic>=2.8,<3.0",
+  "uvicorn[standard]>=0.30,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9.0",
+]
+
+[tool.setuptools]
+packages = [
+  "backend",
+  "backend.api",
+  "backend.services",
+  "backend.pipeline",
+  "backend.pipeline.parsers",
+  "backend.exporters",
+  "backend.storage",
+  "backend.models",
+  "domain",
+  "plugins",
+  "plugins.workflows",
+  "plugins.helpers",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

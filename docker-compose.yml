@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: anki-card-maker-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
+
