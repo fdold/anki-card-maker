@@ -8,6 +8,12 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+CardStatus = Literal["active", "edited", "deleted", "accepted", "rejected"]
+CardRating = Literal["good", "mixed", "bad"]
+RunStatus = Literal["pending", "running", "completed", "failed"]
+ImprovementActionType = Literal["edit_card", "delete_card", "rate_card", "rate_run"]
+
+
 class SourceReference(BaseModel):
     page: int | None = None
     section: str | None = None
@@ -70,10 +76,32 @@ class RunCard(BaseModel):
     workflow_plugin_id: str
     original_front: str
     original_back: str
-    status: Literal["active", "edited", "deleted", "accepted", "rejected"] = "active"
-    rating: Literal["good", "mixed", "bad"] | None = None
+    status: CardStatus = "active"
+    rating: CardRating | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ImprovementAction(BaseModel):
+    action_type: ImprovementActionType
+    card_id: str | None = None
+    front: str | None = None
+    back: str | None = None
+    rating: CardRating | None = None
+
+
+class ImprovementBatch(BaseModel):
+    run_id: str
+    actions: list[ImprovementAction] = Field(default_factory=list)
+
+
+class ImprovementRecord(BaseModel):
+    record_id: str
+    run_id: str
+    action_type: ImprovementActionType
+    card_id: str | None = None
+    applied_at: datetime = Field(default_factory=utc_now)
+    summary: str
 
 
 class ExportableAnkiCard(BaseModel):
@@ -87,10 +115,12 @@ class GenerationRun(BaseModel):
     plugin_id: str
     document_id: str | None = None
     document_ids: list[str] = Field(default_factory=list)
-    status: Literal["pending", "running", "completed", "failed"] = "completed"
+    status: RunStatus = "completed"
+    rating: CardRating | None = None
     workflow_config: dict[str, object] = Field(default_factory=dict)
     cards: list[RunCard] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    improvement_history: list[ImprovementRecord] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
