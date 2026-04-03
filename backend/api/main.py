@@ -1,63 +1,185 @@
 import logging
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Request, status
 
 from backend.api.schemas import (
-    GenerateDocumentRequest,
+    CreateRunRequest,
+    DocumentDetailResponse,
+    DocumentSummaryResponse,
+    RunCardResponse,
+    RunDetailResponse,
+    RunSummaryResponse,
+    UploadDocumentRequest,
 )
+from backend.services.document_service import DocumentService
 from backend.services.registry import create_application_overview
-from backend.services.document_generation_service import generate_cards_from_document_input
+from backend.services.run_service import RunService
+from backend.storage.document_repository import InMemoryDocumentRepository
+from backend.storage.run_repository import InMemoryRunRepository
+from domain.models import GenerationRun, RunCard, StoredDocument
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Anki Card Maker API",
-    version="0.1.0",
-    description="Backend API for modular document-to-Anki flashcard generation.",
-)
 
-
-@app.get("/health")
-def healthcheck() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/overview")
-def overview() -> dict[str, object]:
-    return create_application_overview()
-
-
-@app.post("/generate/document")
-def generate_from_document(
-    request: GenerateDocumentRequest,
-) -> Response:
-    if request.output_type != "csv":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported output type: {request.output_type}",
-        )
-    source_type = request.source_type or request.filename.rsplit(".", 1)[-1].lower()
-    logger.info(
-        "Received document generation request for filename '%s' with workflow '%s' and output '%s'",
-        request.filename,
-        request.workflow_plugin_id,
-        request.output_type,
+def _build_document_summary(document: StoredDocument) -> DocumentSummaryResponse:
+    parsed_content = document.parsed_content
+    return DocumentSummaryResponse(
+        document_id=document.document_id,
+        filename=document.filename,
+        title=document.title,
+        source_type=document.source_type,
+        created_at=document.created_at,
+        block_count=len(parsed_content.blocks) if parsed_content is not None else 0,
+        warnings=list(parsed_content.warnings) if parsed_content is not None else [],
     )
-    try:
-        result = generate_cards_from_document_input(
-            content=request.content,
-            workflow_plugin_id=request.workflow_plugin_id,
-            source_type=source_type,
-            filename=request.filename,
-            title=request.title,
-            document_id=request.document_id,
-            workflow_config=request.workflow_config,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    csv_filename = f"{result.parsed_content.document.title}.csv"
-    return Response(
-        content=result.to_csv(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{csv_filename}"'},
+
+
+def _build_document_detail(document: StoredDocument) -> DocumentDetailResponse:
+    summary = _build_document_summary(document)
+    return DocumentDetailResponse(
+        **summary.model_dump(),
+        has_parsed_content=document.parsed_content is not None,
     )
+
+
+def _build_run_summary(run: GenerationRun) -> RunSummaryResponse:
+    return RunSummaryResponse(
+        run_id=run.run_id,
+        plugin_id=run.plugin_id,
+        document_ids=list(run.document_ids),
+        status=run.status,
+        workflow_config=dict(run.workflow_config),
+        warnings=list(run.warnings),
+        card_count=len(run.cards),
+        created_at=run.created_at,
+        updated_at=run.updated_at,
+        completed_at=run.completed_at,
+    )
+
+
+def _build_run_detail(run: GenerationRun) -> RunDetailResponse:
+    summary = _build_run_summary(run)
+    return RunDetailResponse(
+        **summary.model_dump(),
+        document_id=run.document_id,
+    )
+
+
+def _build_run_card(card: RunCard) -> RunCardResponse:
+    return RunCardResponse(
+        card_id=card.card_id,
+        run_id=card.run_id,
+        front=card.front,
+        back=card.back,
+        source=card.source,
+        tags=list(card.tags),
+        workflow_plugin_id=card.workflow_plugin_id,
+        original_front=card.original_front,
+        original_back=card.original_back,
+        status=card.status,
+        rating=card.rating,
+        created_at=card.created_at,
+        updated_at=card.updated_at,
+    )
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Anki Card Maker API",
+        version="0.1.0",
+        description="Backend API for modular document-to-Anki flashcard generation.",
+    )
+    document_repository = InMemoryDocumentRepository()
+    run_repository = InMemoryRunRepository()
+    app.state.document_service = DocumentService(document_repository=document_repository)
+    app.state.run_service = RunService(
+        document_repository=document_repository,
+        run_repository=run_repository,
+    )
+
+    @app.get("/health")
+    def healthcheck() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/overview")
+    def overview() -> dict[str, object]:
+        return create_application_overview()
+
+    @app.post(
+        "/documents",
+        response_model=DocumentDetailResponse,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def upload_document(
+        request: UploadDocumentRequest,
+        http_request: Request,
+    ) -> DocumentDetailResponse:
+        logger.info("Received document upload for filename '%s'", request.filename)
+        try:
+            stored_document = http_request.app.state.document_service.upload_document(
+                filename=request.filename,
+                content=request.content,
+                source_type=request.source_type,
+                title=request.title,
+                document_id=request.document_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _build_document_detail(stored_document)
+
+    @app.get("/documents", response_model=list[DocumentSummaryResponse])
+    def list_documents(http_request: Request) -> list[DocumentSummaryResponse]:
+        documents = http_request.app.state.document_service.list_documents()
+        return [_build_document_summary(document) for document in documents]
+
+    @app.get("/documents/{document_id}", response_model=DocumentDetailResponse)
+    def get_document(document_id: str, http_request: Request) -> DocumentDetailResponse:
+        stored_document = http_request.app.state.document_service.get_document(document_id)
+        if stored_document is None:
+            raise HTTPException(status_code=404, detail=f"Unknown document: {document_id}")
+        return _build_document_detail(stored_document)
+
+    @app.post(
+        "/runs",
+        response_model=RunDetailResponse,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def create_run(request: CreateRunRequest, http_request: Request) -> RunDetailResponse:
+        logger.info(
+            "Received run creation request for workflow '%s' and %s documents",
+            request.workflow_plugin_id,
+            len(request.document_ids),
+        )
+        try:
+            run = http_request.app.state.run_service.create_run(
+                document_ids=request.document_ids,
+                workflow_plugin_id=request.workflow_plugin_id,
+                workflow_config=request.workflow_config,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _build_run_detail(run)
+
+    @app.get("/runs", response_model=list[RunSummaryResponse])
+    def list_runs(http_request: Request) -> list[RunSummaryResponse]:
+        runs = http_request.app.state.run_service.list_runs()
+        return [_build_run_summary(run) for run in runs]
+
+    @app.get("/runs/{run_id}", response_model=RunDetailResponse)
+    def get_run(run_id: str, http_request: Request) -> RunDetailResponse:
+        run = http_request.app.state.run_service.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
+        return _build_run_detail(run)
+
+    @app.get("/runs/{run_id}/cards", response_model=list[RunCardResponse])
+    def get_run_cards(run_id: str, http_request: Request) -> list[RunCardResponse]:
+        run = http_request.app.state.run_service.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
+        return [_build_run_card(card) for card in run.cards]
+
+    return app
+
+
+app = create_app()

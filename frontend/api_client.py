@@ -10,6 +10,8 @@ def generate_cards_from_document(
     api_base_url: str,
     payload: dict[str, object],
 ) -> str:
+    # TODO: migrate the frontend client to the resource-based API flow:
+    # POST /documents -> POST /runs -> POST /runs/{run_id}/exports.
     endpoint = f"{api_base_url.rstrip('/')}/generate/document"
     output_type = str(payload.get("output_type", "csv"))
     accept_header = {

@@ -1,0 +1,121 @@
+from fastapi.testclient import TestClient
+
+from backend.api.main import create_app
+
+
+def test_documents_endpoints_store_and_return_uploaded_documents() -> None:
+    client = TestClient(create_app())
+
+    upload_response = client.post(
+        "/documents",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.\n\nDNA stores genetic information.",
+        },
+    )
+
+    assert upload_response.status_code == 201
+    payload = upload_response.json()
+    document_id = payload["document_id"]
+    assert payload["filename"] == "biology.txt"
+    assert payload["source_type"] == "txt"
+    assert payload["block_count"] == 2
+    assert payload["has_parsed_content"] is True
+
+    list_response = client.get("/documents")
+    assert list_response.status_code == 200
+    assert any(document["document_id"] == document_id for document in list_response.json())
+
+    detail_response = client.get(f"/documents/{document_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["document_id"] == document_id
+
+
+def test_runs_endpoints_create_run_and_expose_cards() -> None:
+    client = TestClient(create_app())
+    upload_response = client.post(
+        "/documents",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.\n\nDNA stores genetic information.",
+        },
+    )
+    document_id = upload_response.json()["document_id"]
+
+    run_response = client.post(
+        "/runs",
+        json={
+            "document_ids": [document_id],
+            "workflow_plugin_id": "basic_text_workflow",
+            "workflow_config": {"max_cards": 5},
+        },
+    )
+
+    assert run_response.status_code == 201
+    run_payload = run_response.json()
+    run_id = run_payload["run_id"]
+    assert run_payload["document_ids"] == [document_id]
+    assert run_payload["status"] == "completed"
+    assert run_payload["card_count"] == 2
+
+    list_response = client.get("/runs")
+    assert list_response.status_code == 200
+    assert any(run["run_id"] == run_id for run in list_response.json())
+
+    detail_response = client.get(f"/runs/{run_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["run_id"] == run_id
+
+    cards_response = client.get(f"/runs/{run_id}/cards")
+    assert cards_response.status_code == 200
+    cards = cards_response.json()
+    assert len(cards) == 2
+    assert cards[0]["run_id"] == run_id
+    assert cards[0]["original_back"] == cards[0]["back"]
+
+
+def test_runs_endpoint_rejects_unknown_documents() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/runs",
+        json={
+            "document_ids": ["missing-doc"],
+            "workflow_plugin_id": "basic_text_workflow",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unknown document: missing-doc"
+
+
+def test_document_and_run_detail_endpoints_return_404_for_missing_resources() -> None:
+    client = TestClient(create_app())
+
+    document_response = client.get("/documents/missing-doc")
+    assert document_response.status_code == 404
+    assert document_response.json()["detail"] == "Unknown document: missing-doc"
+
+    run_response = client.get("/runs/missing-run")
+    assert run_response.status_code == 404
+    assert run_response.json()["detail"] == "Unknown run: missing-run"
+
+    cards_response = client.get("/runs/missing-run/cards")
+    assert cards_response.status_code == 404
+    assert cards_response.json()["detail"] == "Unknown run: missing-run"
+
+
+def test_legacy_generate_document_endpoint_is_no_longer_available() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/generate/document",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.",
+            "workflow_plugin_id": "basic_text_workflow",
+            "output_type": "csv",
+        },
+    )
+
+    assert response.status_code == 404
