@@ -24,6 +24,8 @@ def test_generate_cards_from_document_calls_api(monkeypatch) -> None:
     def fake_urlopen(api_request):
         assert api_request.full_url == "http://localhost:8000/generate/document"
         assert json.loads(api_request.data.decode("utf-8"))["workflow_plugin_id"] == "basic_text_workflow"
+        assert json.loads(api_request.data.decode("utf-8"))["output_type"] == "csv"
+        assert api_request.headers["Accept"] == "text/csv"
         return DummyResponse("front,back,tags\nQ,A,generated")
 
     monkeypatch.setattr("frontend.api_client.request.urlopen", fake_urlopen)
@@ -34,6 +36,7 @@ def test_generate_cards_from_document_calls_api(monkeypatch) -> None:
             "filename": "biology.txt",
             "content": "Cells",
             "workflow_plugin_id": "basic_text_workflow",
+            "output_type": "csv",
         },
     )
 
@@ -53,5 +56,6 @@ def test_generate_cards_from_document_wraps_http_errors(monkeypatch) -> None:
                 "filename": "biology.txt",
                 "content": "Cells",
                 "workflow_plugin_id": "basic_text_workflow",
+                "output_type": "csv",
             },
         )

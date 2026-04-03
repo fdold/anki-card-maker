@@ -12,3 +12,16 @@ services:
       PYTHONUNBUFFERED: "1"
     command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: anki-card-maker-frontend
+    depends_on:
+      - backend
+    volumes:
+      - ./:/app
+    environment:
+      PYTHONUNBUFFERED: "1"
+      ANKI_CARD_MAKER_API_URL: "http://backend:8000"
+    command: tail -f /dev/null

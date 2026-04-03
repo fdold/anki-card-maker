@@ -1,0 +1,5 @@
+Python uses indentation to define code blocks.
+
+Functions help group reusable logic.
+
+Version control systems track changes to files over time.

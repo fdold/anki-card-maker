@@ -16,6 +16,7 @@ def test_generate_document_returns_csv_export() -> None:
                 "DNA stores genetic information."
             ),
             "workflow_plugin_id": "basic_text_workflow",
+            "output_type": "csv",
             "workflow_config": {"max_cards": 2},
         },
     )
@@ -34,8 +35,24 @@ def test_generate_document_rejects_unknown_plugin() -> None:
             "filename": "biology.txt",
             "content": "Cells are the basic unit of life.",
             "workflow_plugin_id": "missing_workflow",
+            "output_type": "csv",
         },
     )
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Unsupported workflow plugin: missing_workflow"
+
+
+def test_generate_document_rejects_unknown_output_type() -> None:
+    response = client.post(
+        "/generate/document",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.",
+            "workflow_plugin_id": "basic_text_workflow",
+            "output_type": "json",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsupported output type: json"

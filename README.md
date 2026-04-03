@@ -18,6 +18,8 @@ Modular Python application for turning documents into Anki-compatible flashcards
 docker compose up --build
 ```
 
+Danach stehen Backend und ein CLI-Container direkt bereit.
+
 TXT-Workflow per CLI testen:
 
 ```bash
@@ -54,6 +56,34 @@ API-Endpunkte:
 - `GET /health`
 - `GET /overview`
 - `POST /generate/document`
+
+## Docker Test Flow
+
+Beispieltexte liegen in `test-data/samples/`.
+CSV-Exporte kannst du in `test-data/exports/` ablegen.
+
+Alles starten:
+
+```bash
+docker compose up --build
+```
+
+Dann die CLI direkt im Frontend-Container verwenden:
+
+```bash
+docker compose exec frontend anki-card-maker \
+  /app/test-data/samples/biology_basics.txt \
+  --api-url http://backend:8000 \
+  --plugin basic_text_workflow \
+  --output-type csv \
+  --csv-output /app/test-data/exports/biology_basics.csv
+```
+
+Export pruefen:
+
+```bash
+cat test-data/exports/biology_basics.csv
+```
 
 ## Current Status
 

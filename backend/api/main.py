@@ -31,11 +31,17 @@ def overview() -> dict[str, object]:
 def generate_from_document(
     request: GenerateDocumentRequest,
 ) -> Response:
+    if request.output_type != "csv":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported output type: {request.output_type}",
+        )
     source_type = request.source_type or request.filename.rsplit(".", 1)[-1].lower()
     logger.info(
-        "Received document generation request for filename '%s' with workflow '%s'",
+        "Received document generation request for filename '%s' with workflow '%s' and output '%s'",
         request.filename,
         request.workflow_plugin_id,
+        request.output_type,
     )
     try:
         result = generate_cards_from_document_input(

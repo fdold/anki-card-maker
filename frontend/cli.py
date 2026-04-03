@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 from frontend.api_client import ApiClientError, generate_cards_from_document
@@ -12,13 +13,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("input_file", help="Path to a UTF-8 encoded .txt file.")
     parser.add_argument(
         "--api-url",
-        default="http://localhost:8000",
+        default=os.getenv("ANKI_CARD_MAKER_API_URL", "http://localhost:8000"),
         help="Base URL of the backend API.",
     )
     parser.add_argument(
+        "--plugin",
         "--plugin-id",
+        dest="plugin_id",
         default="basic_text_workflow",
         help="Workflow plugin selected for the generation run.",
+    )
+    parser.add_argument(
+        "--output-type",
+        default="csv",
+        help="Requested backend output type. Currently supported: csv.",
     )
     parser.add_argument(
         "--csv-output",
@@ -51,13 +59,14 @@ def main(argv: list[str] | None = None) -> int:
             "filename": filename,
             "content": content,
             "workflow_plugin_id": args.plugin_id,
+            "output_type": args.output_type,
         }
         csv_content = generate_cards_from_document(args.api_url, payload)
     except (ApiClientError, FileNotFoundError, UnicodeDecodeError, ValueError) as exc:
         print(f"Error: {exc}")
         return 1
 
-    if args.csv_output:
+    if args.output_type == "csv" and args.csv_output:
         write_csv_output(csv_content, args.csv_output)
         print(f"CSV export written to {args.csv_output}")
     else:

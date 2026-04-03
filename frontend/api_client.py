@@ -11,10 +11,17 @@ def generate_cards_from_document(
     payload: dict[str, object],
 ) -> str:
     endpoint = f"{api_base_url.rstrip('/')}/generate/document"
+    output_type = str(payload.get("output_type", "csv"))
+    accept_header = {
+        "csv": "text/csv",
+    }.get(output_type, "*/*")
     api_request = request.Request(
         endpoint,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": accept_header,
+        },
         method="POST",
     )
     try:
