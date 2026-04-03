@@ -1,10 +1,11 @@
 import logging
 from dataclasses import dataclass
-from pathlib import Path
-from uuid import uuid4
 
 from backend.exporters.csv_exporter import export_cards_to_csv
-from backend.services.registry import get_parser_for_source_type, get_workflow_plugin
+from backend.services.document_service import DocumentService
+from backend.services.run_service import RunService
+from backend.storage.document_repository import InMemoryDocumentRepository
+from backend.storage.run_repository import InMemoryRunRepository
 from domain.models import ExportableAnkiCard, GenerationRun, ParsedContent
 
 logger = logging.getLogger(__name__)
@@ -30,48 +31,36 @@ def generate_cards_from_document_input(
     document_id: str | None = None,
     workflow_config: dict[str, object] | None = None,
 ) -> DocumentGenerationResult:
-    parser = get_parser_for_source_type(source_type)
-    workflow = get_workflow_plugin(workflow_plugin_id)
-    resolved_document_id = document_id or str(uuid4())
-    resolved_title = title or Path(filename).stem
-
-    logger.info(
-        "Parsing document '%s' as source_type '%s'",
-        resolved_title,
-        source_type,
+    document_repository = InMemoryDocumentRepository()
+    run_repository = InMemoryRunRepository()
+    document_service = DocumentService(document_repository=document_repository)
+    run_service = RunService(
+        document_repository=document_repository,
+        run_repository=run_repository,
     )
-    parsed_content = parser(
-        document_id=resolved_document_id,
-        title=resolved_title,
-        text=content,
+    stored_document = document_service.upload_document(
+        filename=filename,
+        content=content,
+        source_type=source_type,
+        title=title,
+        document_id=document_id,
     )
-
-    logger.info(
-        "Generating cards with workflow '%s'",
-        workflow.manifest.plugin_id,
+    generation_run = run_service.create_run(
+        document_ids=[stored_document.document_id],
+        workflow_plugin_id=workflow_plugin_id,
+        workflow_config=workflow_config,
     )
-    config = workflow.config_model.model_validate(workflow_config or {})
-    cards = workflow.generate_cards(parsed_content, config)
 
     exportable_cards = [
         ExportableAnkiCard(front=card.front, back=card.back, tags=card.tags)
-        for card in cards
+        for card in generation_run.cards
     ]
-    generation_run = GenerationRun(
-        run_id=str(uuid4()),
-        plugin_id=workflow.manifest.plugin_id,
-        document_id=parsed_content.document.document_id,
-        cards=cards,
-        warnings=list(parsed_content.warnings),
-    )
-
-    logger.info(
-        "Finished generation run %s with %s cards",
-        generation_run.run_id,
-        len(generation_run.cards),
-    )
+    if stored_document.parsed_content is None:
+        raise ValueError(
+            f"Document '{stored_document.document_id}' is missing parsed content."
+        )
     return DocumentGenerationResult(
-        parsed_content=parsed_content,
+        parsed_content=stored_document.parsed_content,
         generation_run=generation_run,
         exportable_cards=exportable_cards,
     )
