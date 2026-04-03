@@ -117,3 +117,89 @@ def test_improvement_service_rejects_invalid_card_actions() -> None:
         assert str(exc) == f"Unknown card 'missing-card' for run '{generation_run.run_id}'"
     else:
         raise AssertionError("Expected ValueError for unknown cards.")
+
+
+def test_improvement_service_applies_plugin_refinement_to_selected_cards() -> None:
+    generation_run, improvement_service, _run_repository = _create_run_with_cards()
+    first_card = generation_run.cards[0]
+    second_card = generation_run.cards[1]
+
+    updated_run = improvement_service.apply_improvements(
+        ImprovementBatch(
+            run_id=generation_run.run_id,
+            actions=[
+                ImprovementAction(
+                    action_type="prompt_refine_selected",
+                    card_ids=[first_card.card_id],
+                    prompt="Make this more concise and keep it a question",
+                )
+            ],
+        )
+    )
+
+    refined_first_card = next(card for card in updated_run.cards if card.card_id == first_card.card_id)
+    untouched_second_card = next(card for card in updated_run.cards if card.card_id == second_card.card_id)
+
+    assert refined_first_card.front.endswith("?")
+    assert refined_first_card.back == "Cells are the basic unit of life."
+    assert refined_first_card.status == "edited"
+    assert "improved" in refined_first_card.tags
+    assert untouched_second_card.back == second_card.back
+    assert updated_run.improvement_history[-1].action_type == "prompt_refine_selected"
+
+
+def test_improvement_service_applies_plugin_refinement_to_all_active_cards() -> None:
+    generation_run, improvement_service, _run_repository = _create_run_with_cards()
+
+    updated_run = improvement_service.apply_improvements(
+        ImprovementBatch(
+            run_id=generation_run.run_id,
+            actions=[
+                ImprovementAction(
+                    action_type="prompt_refine_all",
+                    prompt="Keep it a question",
+                )
+            ],
+        )
+    )
+
+    assert all(card.front.endswith("?") for card in updated_run.cards)
+    assert all("improved" in card.tags for card in updated_run.cards)
+
+
+def test_improvement_service_rejects_invalid_plugin_refinement_requests() -> None:
+    generation_run, improvement_service, _run_repository = _create_run_with_cards()
+
+    try:
+        improvement_service.apply_improvements(
+            ImprovementBatch(
+                run_id=generation_run.run_id,
+                actions=[
+                    ImprovementAction(
+                        action_type="prompt_refine_selected",
+                        prompt="Make this more concise",
+                    )
+                ],
+            )
+        )
+    except ValueError as exc:
+        assert str(exc) == "Action 'prompt_refine_selected' requires at least one target card."
+    else:
+        raise AssertionError("Expected ValueError for missing selected target cards.")
+
+    try:
+        improvement_service.apply_improvements(
+            ImprovementBatch(
+                run_id=generation_run.run_id,
+                actions=[
+                    ImprovementAction(
+                        action_type="prompt_refine_all",
+                        prompt="   ",
+                    )
+                ],
+            )
+        )
+    except ValueError as exc:
+        assert str(exc) == "Action 'prompt_refine_all' requires a non-empty prompt."
+    else:
+        raise AssertionError("Expected ValueError for empty refinement prompts.")

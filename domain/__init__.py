@@ -14,6 +14,7 @@ from domain.models import (
     SourceReference,
     StoredDocument,
     TextBlock,
+    WorkflowImprovementRequest,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "SourceReference",
     "StoredDocument",
     "TextBlock",
+    "WorkflowImprovementRequest",
 ]

@@ -3,7 +3,13 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-from domain.models import CardCandidate, ParsedContent, PluginManifest
+from domain.models import (
+    CardCandidate,
+    ParsedContent,
+    PluginManifest,
+    RunCard,
+    WorkflowImprovementRequest,
+)
 
 WorkflowPluginConfigT = TypeVar("WorkflowPluginConfigT", bound=BaseModel)
 
@@ -27,3 +33,13 @@ class WorkflowPlugin(ABC, Generic[WorkflowPluginConfigT]):
         config: WorkflowPluginConfigT,
     ) -> list[CardCandidate]:
         raise NotImplementedError
+
+    def apply_improvement(
+        self,
+        request: WorkflowImprovementRequest,
+        config: WorkflowPluginConfigT,
+    ) -> list[RunCard]:
+        raise NotImplementedError(
+            f"Workflow plugin '{self.manifest.plugin_id}' does not support "
+            f"improvement operation '{request.action_type}'."
+        )

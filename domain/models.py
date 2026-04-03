@@ -11,7 +11,14 @@ def utc_now() -> datetime:
 CardStatus = Literal["active", "edited", "deleted", "accepted", "rejected"]
 CardRating = Literal["good", "mixed", "bad"]
 RunStatus = Literal["pending", "running", "completed", "failed"]
-ImprovementActionType = Literal["edit_card", "delete_card", "rate_card", "rate_run"]
+ImprovementActionType = Literal[
+    "edit_card",
+    "delete_card",
+    "rate_card",
+    "rate_run",
+    "prompt_refine_selected",
+    "prompt_refine_all",
+]
 
 
 class SourceReference(BaseModel):
@@ -55,6 +62,7 @@ class PluginManifest(BaseModel):
     plugin_type: str
     description: str
     supported_input_types: list[str] = Field(default_factory=list)
+    supported_operations: list[str] = Field(default_factory=list)
     config_schema: dict[str, object] = Field(default_factory=dict)
 
 
@@ -85,9 +93,11 @@ class RunCard(BaseModel):
 class ImprovementAction(BaseModel):
     action_type: ImprovementActionType
     card_id: str | None = None
+    card_ids: list[str] = Field(default_factory=list)
     front: str | None = None
     back: str | None = None
     rating: CardRating | None = None
+    prompt: str | None = None
 
 
 class ImprovementBatch(BaseModel):
@@ -102,6 +112,13 @@ class ImprovementRecord(BaseModel):
     card_id: str | None = None
     applied_at: datetime = Field(default_factory=utc_now)
     summary: str
+
+
+class WorkflowImprovementRequest(BaseModel):
+    action_type: Literal["prompt_refine_selected", "prompt_refine_all"]
+    run_id: str
+    prompt: str
+    cards: list[RunCard] = Field(default_factory=list)
 
 
 class ExportableAnkiCard(BaseModel):

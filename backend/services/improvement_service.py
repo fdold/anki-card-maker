@@ -1,6 +1,7 @@
 import logging
 from uuid import uuid4
 
+from backend.services.registry import get_workflow_plugin
 from backend.storage.run_repository import InMemoryRunRepository
 from domain.models import (
     GenerationRun,
@@ -8,6 +9,7 @@ from domain.models import (
     ImprovementBatch,
     ImprovementRecord,
     RunCard,
+    WorkflowImprovementRequest,
     utc_now,
 )
 
@@ -57,6 +59,8 @@ class ImprovementService:
             return self._rate_card(run, action)
         if action.action_type == "rate_run":
             return self._rate_run(run, action)
+        if action.action_type in {"prompt_refine_selected", "prompt_refine_all"}:
+            return self._apply_plugin_improvement(run, action)
         raise ValueError(f"Unsupported improvement action: {action.action_type}")
 
     def _edit_card(
@@ -158,11 +162,74 @@ class ImprovementService:
             summary=f"Rated run {run.run_id} as {action.rating}",
         )
 
+    def _apply_plugin_improvement(
+        self,
+        run: GenerationRun,
+        action: ImprovementAction,
+    ) -> tuple[GenerationRun, ImprovementRecord]:
+        if action.prompt is None or not action.prompt.strip():
+            raise ValueError(
+                f"Action '{action.action_type}' requires a non-empty prompt."
+            )
+
+        workflow = get_workflow_plugin(run.plugin_id)
+        if action.action_type not in workflow.manifest.supported_operations:
+            raise ValueError(
+                f"Workflow plugin '{run.plugin_id}' does not support "
+                f"improvement action '{action.action_type}'."
+            )
+
+        selected_cards = self._get_cards_for_plugin_improvement(run, action)
+        config = workflow.config_model.model_validate(run.workflow_config)
+        improved_cards = workflow.apply_improvement(
+            WorkflowImprovementRequest(
+                action_type=action.action_type,
+                run_id=run.run_id,
+                prompt=action.prompt.strip(),
+                cards=selected_cards,
+            ),
+            config,
+        )
+
+        updated_run = run
+        for improved_card in improved_cards:
+            updated_run = self._replace_card(updated_run, improved_card)
+
+        summary_suffix = (
+            f"{len(improved_cards)} selected cards"
+            if action.action_type == "prompt_refine_selected"
+            else f"{len(improved_cards)} cards"
+        )
+        return updated_run, ImprovementRecord(
+            record_id=str(uuid4()),
+            run_id=run.run_id,
+            action_type=action.action_type,
+            summary=(
+                f"Applied workflow prompt refinement to {summary_suffix} "
+                f"with plugin '{run.plugin_id}'"
+            ),
+        )
+
     def _get_required_card(self, run: GenerationRun, card_id: str) -> RunCard:
         for card in run.cards:
             if card.card_id == card_id:
                 return card
         raise ValueError(f"Unknown card '{card_id}' for run '{run.run_id}'")
+
+    def _get_cards_for_plugin_improvement(
+        self,
+        run: GenerationRun,
+        action: ImprovementAction,
+    ) -> list[RunCard]:
+        if action.action_type == "prompt_refine_all":
+            return [card for card in run.cards if card.status != "deleted"]
+
+        selected_card_ids = action.card_ids or ([action.card_id] if action.card_id else [])
+        if not selected_card_ids:
+            raise ValueError(
+                "Action 'prompt_refine_selected' requires at least one target card."
+            )
+        return [self._get_required_card(run, card_id) for card_id in selected_card_ids]
 
     def _replace_card(self, run: GenerationRun, updated_card: RunCard) -> GenerationRun:
         updated_cards = [
