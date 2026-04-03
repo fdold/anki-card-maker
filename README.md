@@ -23,19 +23,40 @@ Danach stehen Backend und ein CLI-Container direkt bereit.
 TXT-Workflow per CLI testen:
 
 ```bash
-python -m frontend.cli path/to/notes.txt --plugin-id basic_text_workflow --csv-output cards.csv
+python -m frontend.cli generate path/to/notes.txt --plugin-id basic_text_workflow --csv-output cards.csv
 ```
 
 Nach Installation funktioniert auch der Konsolenbefehl:
 
 ```bash
-anki-card-maker path/to/notes.txt --api-url http://localhost:8000 --plugin-id basic_text_workflow
+anki-card-maker generate path/to/notes.txt --api-url http://localhost:8000 --plugin-id basic_text_workflow
 ```
 
 Die CLI liegt im `frontend/` und spricht nur mit dem Backend-API-Endpoint.
 Parserwahl, TXT-Segmentierung, Workflow-Ausfuehrung und Export liegen im Backend.
 Die CLI nutzt intern jetzt denselben Ressourcen-Flow wie die API:
 Dokument hochladen, Run erzeugen, Export erstellen und Ergebnis herunterladen.
+Der alte Kurzaufruf `anki-card-maker path/to/file.txt` bleibt als Abkuerzung fuer `generate` erhalten.
+
+Wichtige CLI-Befehle:
+
+```bash
+anki-card-maker overview
+anki-card-maker upload path/to/notes.txt
+anki-card-maker documents
+anki-card-maker document <document-id>
+anki-card-maker create-run <document-id> --plugin basic_text_workflow
+anki-card-maker runs
+anki-card-maker run <run-id>
+anki-card-maker cards <run-id>
+anki-card-maker improve <run-id> --action rate_run --rating good
+anki-card-maker improve <run-id> --action prompt_refine_selected --target-card-id <card-id> --prompt "Keep it a question"
+anki-card-maker improvements <run-id>
+anki-card-maker create-export <run-id> --exporter csv
+anki-card-maker export <export-id>
+anki-card-maker download-export <export-id> --output cards.csv
+anki-card-maker generate path/to/notes.txt --csv-output cards.csv
+```
 
 ## Local Testing
 

@@ -11,7 +11,7 @@ def _request_json(
     *,
     method: str,
     payload: dict[str, object] | None = None,
-) -> dict[str, object]:
+) -> object:
     api_request = request.Request(
         api_url,
         data=json.dumps(payload).encode("utf-8") if payload is not None else None,
@@ -52,6 +52,122 @@ def _request_text(
         raise ApiClientError(f"Could not reach backend API: {exc.reason}") from exc
 
 
+def upload_document(api_base_url: str, payload: dict[str, object]) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/documents",
+        method="POST",
+        payload=payload,
+    )
+    return dict(response)
+
+
+def list_documents(api_base_url: str) -> list[dict[str, object]]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/documents",
+        method="GET",
+    )
+    return list(response)
+
+
+def get_document(api_base_url: str, document_id: str) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/documents/{document_id}",
+        method="GET",
+    )
+    return dict(response)
+
+
+def create_run(api_base_url: str, payload: dict[str, object]) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs",
+        method="POST",
+        payload=payload,
+    )
+    return dict(response)
+
+
+def list_runs(api_base_url: str) -> list[dict[str, object]]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs",
+        method="GET",
+    )
+    return list(response)
+
+
+def get_run(api_base_url: str, run_id: str) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs/{run_id}",
+        method="GET",
+    )
+    return dict(response)
+
+
+def list_run_cards(api_base_url: str, run_id: str) -> list[dict[str, object]]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs/{run_id}/cards",
+        method="GET",
+    )
+    return list(response)
+
+
+def apply_improvements(
+    api_base_url: str,
+    run_id: str,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs/{run_id}/improvements",
+        method="POST",
+        payload=payload,
+    )
+    return dict(response)
+
+
+def list_improvements(api_base_url: str, run_id: str) -> list[dict[str, object]]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs/{run_id}/improvements",
+        method="GET",
+    )
+    return list(response)
+
+
+def create_export(
+    api_base_url: str,
+    run_id: str,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/runs/{run_id}/exports",
+        method="POST",
+        payload=payload,
+    )
+    return dict(response)
+
+
+def get_export(api_base_url: str, export_id: str) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/exports/{export_id}",
+        method="GET",
+    )
+    return dict(response)
+
+
+def download_export(api_base_url: str, export_id: str, media_type: str = "text/csv") -> str:
+    return _request_text(
+        f"{api_base_url.rstrip('/')}/exports/{export_id}/download",
+        method="GET",
+        accept=media_type,
+    )
+
+
+def get_overview(api_base_url: str) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/overview",
+        method="GET",
+    )
+    return dict(response)
+
+
 def generate_cards_from_document(
     api_base_url: str,
     payload: dict[str, object],
@@ -60,10 +176,8 @@ def generate_cards_from_document(
     if output_type != "csv":
         raise ApiClientError(f"Unsupported output type for frontend client: {output_type}")
 
-    base_url = api_base_url.rstrip("/")
-    document_response = _request_json(
-        f"{base_url}/documents",
-        method="POST",
+    document_response = upload_document(
+        api_base_url,
         payload={
             "filename": payload["filename"],
             "content": payload["content"],
@@ -72,22 +186,17 @@ def generate_cards_from_document(
             "document_id": payload.get("document_id"),
         },
     )
-    run_response = _request_json(
-        f"{base_url}/runs",
-        method="POST",
+    run_response = create_run(
+        api_base_url,
         payload={
             "document_ids": [document_response["document_id"]],
             "workflow_plugin_id": payload["workflow_plugin_id"],
             "workflow_config": payload.get("workflow_config", {}),
         },
     )
-    export_response = _request_json(
-        f"{base_url}/runs/{run_response['run_id']}/exports",
-        method="POST",
+    export_response = create_export(
+        api_base_url,
+        str(run_response["run_id"]),
         payload={"exporter_id": output_type},
     )
-    return _request_text(
-        f"{base_url}/exports/{export_response['export_id']}/download",
-        method="GET",
-        accept="text/csv",
-    )
+    return download_export(api_base_url, str(export_response["export_id"]), "text/csv")
