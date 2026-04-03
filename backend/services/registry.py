@@ -17,7 +17,7 @@ class ExporterDefinition:
 
 def get_workflow_plugin(plugin_id: str):
     workflows = {
-        "basic_text_workflow": BasicTextWorkflowPlugin(),
+        workflow.manifest.plugin_id: workflow for workflow in list_workflow_plugins()
     }
     try:
         return workflows[plugin_id]
@@ -37,12 +37,7 @@ def get_parser_for_source_type(source_type: str):
 
 def get_exporter(exporter_id: str) -> ExporterDefinition:
     exporters = {
-        "csv": ExporterDefinition(
-            exporter_id="csv",
-            media_type="text/csv",
-            file_extension="csv",
-            export=export_cards_to_csv,
-        ),
+        exporter.exporter_id: exporter for exporter in list_exporters()
     }
     try:
         return exporters[exporter_id]
@@ -50,11 +45,43 @@ def get_exporter(exporter_id: str) -> ExporterDefinition:
         raise ValueError(f"Unsupported exporter: {exporter_id}") from exc
 
 
+def list_workflow_plugins() -> list[BasicTextWorkflowPlugin]:
+    return [BasicTextWorkflowPlugin()]
+
+
+def list_exporters() -> list[ExporterDefinition]:
+    return [
+        ExporterDefinition(
+            exporter_id="csv",
+            media_type="text/csv",
+            file_extension="csv",
+            export=export_cards_to_csv,
+        )
+    ]
+
+
 def create_application_overview() -> dict[str, object]:
-    workflow = BasicTextWorkflowPlugin()
+    workflows = list_workflow_plugins()
+    exporters = list_exporters()
     return {
-        "active_workflow_example": workflow.manifest.model_dump(),
+        "active_workflow_example": workflows[0].manifest.model_dump(),
         "supported_input_formats": ["txt"],
-        "available_workflow_plugins": [workflow.manifest.model_dump()],
-        "export_targets": ["csv"],
+        "available_workflow_plugins": [workflow.manifest.model_dump() for workflow in workflows],
+        "available_exporters": [
+            {
+                "exporter_id": exporter.exporter_id,
+                "media_type": exporter.media_type,
+                "file_extension": exporter.file_extension,
+            }
+            for exporter in exporters
+        ],
+        "export_targets": [exporter.exporter_id for exporter in exporters],
+        "api_resources": [
+            "/documents",
+            "/runs",
+            "/runs/{run_id}/cards",
+            "/runs/{run_id}/exports",
+            "/exports/{export_id}",
+            "/exports/{export_id}/download",
+        ],
     }

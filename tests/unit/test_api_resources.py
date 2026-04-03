@@ -31,6 +31,22 @@ def test_documents_endpoints_store_and_return_uploaded_documents() -> None:
     assert detail_response.json()["document_id"] == document_id
 
 
+def test_overview_exposes_workflows_exporters_and_api_resources() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/overview")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["supported_input_formats"] == ["txt"]
+    assert payload["available_workflow_plugins"][0]["plugin_id"] == "basic_text_workflow"
+    assert "prompt_refine_selected" in payload["available_workflow_plugins"][0]["supported_operations"]
+    assert payload["available_exporters"][0]["exporter_id"] == "csv"
+    assert payload["available_exporters"][0]["media_type"] == "text/csv"
+    assert "/documents" in payload["api_resources"]
+    assert "/runs/{run_id}/exports" in payload["api_resources"]
+
+
 def test_runs_endpoints_create_run_and_expose_cards() -> None:
     client = TestClient(create_app())
     upload_response = client.post(

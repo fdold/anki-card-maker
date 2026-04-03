@@ -32,8 +32,10 @@ Nach Installation funktioniert auch der Konsolenbefehl:
 anki-card-maker path/to/notes.txt --api-url http://localhost:8000 --plugin-id basic_text_workflow
 ```
 
-Die CLI liegt im `frontend/` und spricht nur mit dem Backend-API-Endpoint. Parserwahl, TXT-Segmentierung und Workflow-Ausfuehrung liegen im Backend.
-Der CSV-Export wird vollstaendig im Backend erzeugt und von der API direkt zurueckgegeben.
+Die CLI liegt im `frontend/` und spricht nur mit dem Backend-API-Endpoint.
+Parserwahl, TXT-Segmentierung, Workflow-Ausfuehrung und Export liegen im Backend.
+Die CLI verwendet derzeit noch den alten Ein-Schritt-Flow und ist mit einem `TODO`
+zur Migration auf die neue Ressourcen-API markiert.
 
 ## Local Testing
 
@@ -58,24 +60,52 @@ make install-dev
 Dokumente direkt ueber die API im Container verarbeiten:
 
 ```bash
-curl -X POST http://localhost:8000/generate/document \
+curl -X POST http://localhost:8000/documents \
   -H "Content-Type: application/json" \
-  -H "Accept: text/csv" \
   -d '{
     "filename": "biology.txt",
-    "content": "Cells are the basic unit of life.\n\nDNA stores genetic information.",
+    "content": "Cells are the basic unit of life.\n\nDNA stores genetic information."
+  }'
+```
+
+Anschliessend einen Run erzeugen:
+
+```bash
+curl -X POST http://localhost:8000/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_ids": ["<document-id>"],
     "workflow_plugin_id": "basic_text_workflow",
     "workflow_config": {
       "max_cards": 10
     }
-  }' -o biology.csv
+  }'
+```
+
+Und den Export erstellen:
+
+```bash
+curl -X POST http://localhost:8000/runs/<run-id>/exports \
+  -H "Content-Type: application/json" \
+  -d '{
+    "exporter_id": "csv"
+  }'
 ```
 
 API-Endpunkte:
 
 - `GET /health`
 - `GET /overview`
-- `POST /generate/document`
+- `POST /documents`
+- `GET /documents`
+- `GET /documents/{document_id}`
+- `POST /runs`
+- `GET /runs`
+- `GET /runs/{run_id}`
+- `GET /runs/{run_id}/cards`
+- `POST /runs/{run_id}/exports`
+- `GET /exports/{export_id}`
+- `GET /exports/{export_id}/download`
 
 ## Docker Test Flow
 
@@ -113,5 +143,7 @@ The repository now contains a clean initial foundation with:
 - centralized domain models
 - TXT parser as the first stable input format
 - first workflow plugin scaffold
-- CSV exporter for early Anki compatibility
-- baseline tests for parser, workflow, and export
+- run-based document generation and card review foundation
+- workflow-driven and generic card improvement operations
+- exporter-based CSV flow for early Anki compatibility
+- baseline tests for parser, workflow, review, and export
