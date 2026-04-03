@@ -35,6 +35,26 @@ anki-card-maker path/to/notes.txt --api-url http://localhost:8000 --plugin-id ba
 Die CLI liegt im `frontend/` und spricht nur mit dem Backend-API-Endpoint. Parserwahl, TXT-Segmentierung und Workflow-Ausfuehrung liegen im Backend.
 Der CSV-Export wird vollstaendig im Backend erzeugt und von der API direkt zurueckgegeben.
 
+## Local Testing
+
+Die lokale Testumgebung nutzt die Projekt-`.venv`. Damit Tests nicht von einem globalen Python abhaengen, verwende:
+
+```bash
+make test
+```
+
+Nur die Unit-Tests:
+
+```bash
+make test-unit
+```
+
+Falls die virtuelle Umgebung bereits existiert, aber die Dev-Abhaengigkeiten fehlen:
+
+```bash
+make install-dev
+```
+
 Dokumente direkt ueber die API im Container verarbeiten:
 
 ```bash
