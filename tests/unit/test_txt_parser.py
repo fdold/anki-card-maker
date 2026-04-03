@@ -9,3 +9,10 @@ def test_parse_txt_document_creates_single_block() -> None:
     assert parsed.blocks[0].text == "Hello world"
     assert parsed.blocks[0].source.section == "Sample"
 
+
+def test_parse_txt_document_splits_paragraphs_into_blocks() -> None:
+    parsed = parse_txt_document("doc-1", "Sample", "First block\n\nSecond block")
+
+    assert len(parsed.blocks) == 2
+    assert parsed.blocks[0].source.position == 0
+    assert parsed.blocks[1].text == "Second block"
