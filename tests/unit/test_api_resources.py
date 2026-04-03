@@ -90,6 +90,64 @@ def test_runs_endpoints_create_run_and_expose_cards() -> None:
     assert cards[0]["original_back"] == cards[0]["back"]
 
 
+def test_improvement_endpoints_apply_actions_and_list_history() -> None:
+    client = TestClient(create_app())
+    upload_response = client.post(
+        "/documents",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.\n\nDNA stores genetic information.",
+        },
+    )
+    document_id = upload_response.json()["document_id"]
+    run_response = client.post(
+        "/runs",
+        json={
+            "document_ids": [document_id],
+            "workflow_plugin_id": "basic_text_workflow",
+            "workflow_config": {"max_cards": 5},
+        },
+    )
+    run_id = run_response.json()["run_id"]
+    cards_response = client.get(f"/runs/{run_id}/cards")
+    first_card_id = cards_response.json()[0]["card_id"]
+
+    improvement_response = client.post(
+        f"/runs/{run_id}/improvements",
+        json={
+            "actions": [
+                {
+                    "action_type": "edit_card",
+                    "card_id": first_card_id,
+                    "front": "What are cells?",
+                },
+                {
+                    "action_type": "prompt_refine_selected",
+                    "card_ids": [first_card_id],
+                    "prompt": "Keep it a question",
+                },
+            ]
+        },
+    )
+
+    assert improvement_response.status_code == 200
+    updated_run = improvement_response.json()
+    assert updated_run["run_id"] == run_id
+    assert updated_run["card_count"] == 2
+
+    updated_cards_response = client.get(f"/runs/{run_id}/cards")
+    updated_cards = updated_cards_response.json()
+    assert updated_cards[0]["front"].endswith("?")
+    assert updated_cards[0]["status"] == "edited"
+
+    history_response = client.get(f"/runs/{run_id}/improvements")
+    assert history_response.status_code == 200
+    history = history_response.json()
+    assert len(history) == 2
+    assert history[0]["action_type"] == "edit_card"
+    assert history[1]["action_type"] == "prompt_refine_selected"
+
+
 def test_runs_endpoint_rejects_unknown_documents() -> None:
     client = TestClient(create_app())
 
@@ -119,6 +177,10 @@ def test_document_and_run_detail_endpoints_return_404_for_missing_resources() ->
     cards_response = client.get("/runs/missing-run/cards")
     assert cards_response.status_code == 404
     assert cards_response.json()["detail"] == "Unknown run: missing-run"
+
+    improvements_response = client.get("/runs/missing-run/improvements")
+    assert improvements_response.status_code == 404
+    assert improvements_response.json()["detail"] == "Unknown run: missing-run"
 
 
 def test_export_endpoints_create_describe_and_download_exports() -> None:
@@ -183,6 +245,42 @@ def test_export_endpoints_validate_unknown_resources_and_exporters() -> None:
     missing_download_response = client.get("/exports/missing-export/download")
     assert missing_download_response.status_code == 404
     assert missing_download_response.json()["detail"] == "Unknown export: missing-export"
+
+
+def test_improvement_endpoints_validate_bad_requests() -> None:
+    client = TestClient(create_app())
+    upload_response = client.post(
+        "/documents",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.",
+        },
+    )
+    document_id = upload_response.json()["document_id"]
+    run_response = client.post(
+        "/runs",
+        json={
+            "document_ids": [document_id],
+            "workflow_plugin_id": "basic_text_workflow",
+        },
+    )
+    run_id = run_response.json()["run_id"]
+
+    response = client.post(
+        f"/runs/{run_id}/improvements",
+        json={
+            "actions": [
+                {
+                    "action_type": "edit_card",
+                    "card_id": "missing-card",
+                    "front": "Updated front",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Unknown card 'missing-card'" in response.json()["detail"]
 
 
 def test_legacy_generate_document_endpoint_is_no_longer_available() -> None:

@@ -66,6 +66,29 @@ class RunCardResponse(BaseModel):
     updated_at: datetime
 
 
+class ImprovementActionRequest(BaseModel):
+    action_type: str
+    card_id: str | None = None
+    card_ids: list[str] = Field(default_factory=list)
+    front: str | None = None
+    back: str | None = None
+    rating: str | None = None
+    prompt: str | None = None
+
+
+class ApplyImprovementsRequest(BaseModel):
+    actions: list[ImprovementActionRequest] = Field(default_factory=list)
+
+
+class ImprovementRecordResponse(BaseModel):
+    record_id: str
+    run_id: str
+    action_type: str
+    card_id: str | None = None
+    applied_at: datetime
+    summary: str
+
+
 class CreateExportRequest(BaseModel):
     exporter_id: str = Field(..., min_length=1)
     card_ids: list[str] = Field(default_factory=list)

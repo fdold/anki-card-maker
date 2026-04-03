@@ -3,11 +3,14 @@ import logging
 from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from backend.api.schemas import (
+    ApplyImprovementsRequest,
     CreateRunRequest,
     CreateExportRequest,
     DocumentDetailResponse,
     DocumentSummaryResponse,
     ExportResponse,
+    ImprovementRecordResponse,
+    ImprovementActionRequest,
     RunCardResponse,
     RunDetailResponse,
     RunSummaryResponse,
@@ -15,12 +18,21 @@ from backend.api.schemas import (
 )
 from backend.services.document_service import DocumentService
 from backend.services.export_service import ExportService
+from backend.services.improvement_service import ImprovementService
 from backend.services.registry import create_application_overview
 from backend.services.run_service import RunService
 from backend.storage.document_repository import InMemoryDocumentRepository
 from backend.storage.export_repository import InMemoryExportRepository
 from backend.storage.run_repository import InMemoryRunRepository
-from domain.models import ExportArtifact, GenerationRun, RunCard, StoredDocument
+from domain.models import (
+    ExportArtifact,
+    GenerationRun,
+    ImprovementAction,
+    ImprovementBatch,
+    ImprovementRecord,
+    RunCard,
+    StoredDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +114,31 @@ def _build_export_response(export_artifact: ExportArtifact) -> ExportResponse:
     )
 
 
+def _build_improvement_record_response(
+    record: ImprovementRecord,
+) -> ImprovementRecordResponse:
+    return ImprovementRecordResponse(
+        record_id=record.record_id,
+        run_id=record.run_id,
+        action_type=record.action_type,
+        card_id=record.card_id,
+        applied_at=record.applied_at,
+        summary=record.summary,
+    )
+
+
+def _to_improvement_action(action: ImprovementActionRequest) -> ImprovementAction:
+    return ImprovementAction(
+        action_type=action.action_type,
+        card_id=action.card_id,
+        card_ids=list(action.card_ids),
+        front=action.front,
+        back=action.back,
+        rating=action.rating,
+        prompt=action.prompt,
+    )
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Anki Card Maker API",
@@ -116,6 +153,7 @@ def create_app() -> FastAPI:
         document_repository=document_repository,
         run_repository=run_repository,
     )
+    app.state.improvement_service = ImprovementService(run_repository=run_repository)
     app.state.export_service = ExportService(
         run_repository=run_repository,
         export_repository=export_repository,
@@ -203,6 +241,42 @@ def create_app() -> FastAPI:
         if run is None:
             raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
         return [_build_run_card(card) for card in run.cards]
+
+    @app.post(
+        "/runs/{run_id}/improvements",
+        response_model=RunDetailResponse,
+    )
+    def apply_improvements(
+        run_id: str,
+        request: ApplyImprovementsRequest,
+        http_request: Request,
+    ) -> RunDetailResponse:
+        try:
+            updated_run = http_request.app.state.improvement_service.apply_improvements(
+                ImprovementBatch(
+                    run_id=run_id,
+                    actions=[_to_improvement_action(action) for action in request.actions],
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _build_run_detail(updated_run)
+
+    @app.get(
+        "/runs/{run_id}/improvements",
+        response_model=list[ImprovementRecordResponse],
+    )
+    def list_improvements(
+        run_id: str,
+        http_request: Request,
+    ) -> list[ImprovementRecordResponse]:
+        run = http_request.app.state.run_service.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
+        return [
+            _build_improvement_record_response(record)
+            for record in run.improvement_history
+        ]
 
     @app.post(
         "/runs/{run_id}/exports",
