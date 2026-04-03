@@ -21,12 +21,27 @@ class DummyResponse:
 
 
 def test_generate_cards_from_document_calls_api(monkeypatch) -> None:
+    requests_seen = []
+
     def fake_urlopen(api_request):
-        assert api_request.full_url == "http://localhost:8000/generate/document"
-        assert json.loads(api_request.data.decode("utf-8"))["workflow_plugin_id"] == "basic_text_workflow"
-        assert json.loads(api_request.data.decode("utf-8"))["output_type"] == "csv"
-        assert api_request.headers["Accept"] == "text/csv"
-        return DummyResponse("front,back,tags\nQ,A,generated")
+        requests_seen.append(api_request)
+        if api_request.full_url == "http://localhost:8000/documents":
+            payload = json.loads(api_request.data.decode("utf-8"))
+            assert payload["filename"] == "biology.txt"
+            return DummyResponse('{"document_id": "doc-1"}')
+        if api_request.full_url == "http://localhost:8000/runs":
+            payload = json.loads(api_request.data.decode("utf-8"))
+            assert payload["document_ids"] == ["doc-1"]
+            assert payload["workflow_plugin_id"] == "basic_text_workflow"
+            return DummyResponse('{"run_id": "run-1"}')
+        if api_request.full_url == "http://localhost:8000/runs/run-1/exports":
+            payload = json.loads(api_request.data.decode("utf-8"))
+            assert payload["exporter_id"] == "csv"
+            return DummyResponse('{"export_id": "export-1"}')
+        if api_request.full_url == "http://localhost:8000/exports/export-1/download":
+            assert api_request.headers["Accept"] == "text/csv"
+            return DummyResponse("front,back,tags\nQ,A,generated")
+        raise AssertionError(f"Unexpected request URL: {api_request.full_url}")
 
     monkeypatch.setattr("frontend.api_client.request.urlopen", fake_urlopen)
 
@@ -41,6 +56,12 @@ def test_generate_cards_from_document_calls_api(monkeypatch) -> None:
     )
 
     assert "front,back,tags" in response
+    assert [request.full_url for request in requests_seen] == [
+        "http://localhost:8000/documents",
+        "http://localhost:8000/runs",
+        "http://localhost:8000/runs/run-1/exports",
+        "http://localhost:8000/exports/export-1/download",
+    ]
 
 
 def test_generate_cards_from_document_wraps_http_errors(monkeypatch) -> None:
@@ -57,5 +78,18 @@ def test_generate_cards_from_document_wraps_http_errors(monkeypatch) -> None:
                 "content": "Cells",
                 "workflow_plugin_id": "basic_text_workflow",
                 "output_type": "csv",
+            },
+        )
+
+
+def test_generate_cards_from_document_rejects_unsupported_output_types() -> None:
+    with pytest.raises(ApiClientError, match="Unsupported output type"):
+        generate_cards_from_document(
+            "http://localhost:8000",
+            {
+                "filename": "biology.txt",
+                "content": "Cells",
+                "workflow_plugin_id": "basic_text_workflow",
+                "output_type": "json",
             },
         )

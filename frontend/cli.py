@@ -54,8 +54,6 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        # TODO: switch the CLI to the resource-based backend flow once
-        # document, run, improvement, and export endpoints are fully wired.
         filename, content = read_txt_document(args.input_file)
         payload = {
             "filename": filename,

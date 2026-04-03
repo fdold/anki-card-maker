@@ -30,4 +30,4 @@ The old one-shot generation endpoint is no longer part of the backend API.
 - Shared schemas live in `domain/`.
 - Central model/provider integrations belong in `backend/models/`.
 - Exporters stay dedicated backend modules and should not contain workflow logic.
-- The frontend CLI still has a `TODO` to migrate to the new multi-step API flow.
+- The frontend CLI now uses the same multi-step API flow as the backend resources.

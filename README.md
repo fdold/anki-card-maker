@@ -34,8 +34,8 @@ anki-card-maker path/to/notes.txt --api-url http://localhost:8000 --plugin-id ba
 
 Die CLI liegt im `frontend/` und spricht nur mit dem Backend-API-Endpoint.
 Parserwahl, TXT-Segmentierung, Workflow-Ausfuehrung und Export liegen im Backend.
-Die CLI verwendet derzeit noch den alten Ein-Schritt-Flow und ist mit einem `TODO`
-zur Migration auf die neue Ressourcen-API markiert.
+Die CLI nutzt intern jetzt denselben Ressourcen-Flow wie die API:
+Dokument hochladen, Run erzeugen, Export erstellen und Ergebnis herunterladen.
 
 ## Local Testing
 
