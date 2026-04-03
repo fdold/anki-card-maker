@@ -105,6 +105,70 @@ def test_document_and_run_detail_endpoints_return_404_for_missing_resources() ->
     assert cards_response.json()["detail"] == "Unknown run: missing-run"
 
 
+def test_export_endpoints_create_describe_and_download_exports() -> None:
+    client = TestClient(create_app())
+    upload_response = client.post(
+        "/documents",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.\n\nDNA stores genetic information.",
+        },
+    )
+    document_id = upload_response.json()["document_id"]
+    run_response = client.post(
+        "/runs",
+        json={
+            "document_ids": [document_id],
+            "workflow_plugin_id": "basic_text_workflow",
+            "workflow_config": {"max_cards": 5},
+        },
+    )
+    run_id = run_response.json()["run_id"]
+
+    export_response = client.post(
+        f"/runs/{run_id}/exports",
+        json={"exporter_id": "csv"},
+    )
+
+    assert export_response.status_code == 201
+    export_payload = export_response.json()
+    export_id = export_payload["export_id"]
+    assert export_payload["run_id"] == run_id
+    assert export_payload["exporter_id"] == "csv"
+    assert export_payload["filename"] == "biology.csv"
+    assert export_payload["media_type"] == "text/csv"
+    assert export_payload["card_count"] == 2
+
+    detail_response = client.get(f"/exports/{export_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["export_id"] == export_id
+
+    download_response = client.get(f"/exports/{export_id}/download")
+    assert download_response.status_code == 200
+    assert download_response.headers["content-type"].startswith("text/csv")
+    assert 'filename="biology.csv"' in download_response.headers["content-disposition"]
+    assert "front,back,tags" in download_response.text
+
+
+def test_export_endpoints_validate_unknown_resources_and_exporters() -> None:
+    client = TestClient(create_app())
+
+    create_response = client.post(
+        "/runs/missing-run/exports",
+        json={"exporter_id": "csv"},
+    )
+    assert create_response.status_code == 400
+    assert create_response.json()["detail"] == "Unknown run: missing-run"
+
+    missing_export_response = client.get("/exports/missing-export")
+    assert missing_export_response.status_code == 404
+    assert missing_export_response.json()["detail"] == "Unknown export: missing-export"
+
+    missing_download_response = client.get("/exports/missing-export/download")
+    assert missing_download_response.status_code == 404
+    assert missing_download_response.json()["detail"] == "Unknown export: missing-export"
+
+
 def test_legacy_generate_document_endpoint_is_no_longer_available() -> None:
     client = TestClient(create_app())
 

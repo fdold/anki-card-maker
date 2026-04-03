@@ -3,6 +3,7 @@
 from domain.models import (
     CardCandidate,
     Document,
+    ExportArtifact,
     ExportableAnkiCard,
     GenerationRun,
     ImprovementAction,
@@ -20,6 +21,7 @@ from domain.models import (
 __all__ = [
     "CardCandidate",
     "Document",
+    "ExportArtifact",
     "ExportableAnkiCard",
     "GenerationRun",
     "ImprovementAction",

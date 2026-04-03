@@ -11,6 +11,7 @@ def utc_now() -> datetime:
 CardStatus = Literal["active", "edited", "deleted", "accepted", "rejected"]
 CardRating = Literal["good", "mixed", "bad"]
 RunStatus = Literal["pending", "running", "completed", "failed"]
+ExportStatus = Literal["pending", "completed", "failed"]
 ImprovementActionType = Literal[
     "edit_card",
     "delete_card",
@@ -125,6 +126,19 @@ class ExportableAnkiCard(BaseModel):
     front: str
     back: str
     tags: list[str] = Field(default_factory=list)
+
+
+class ExportArtifact(BaseModel):
+    export_id: str
+    run_id: str
+    exporter_id: str
+    card_ids: list[str] = Field(default_factory=list)
+    filename: str
+    media_type: str
+    content: str
+    status: ExportStatus = "completed"
+    created_at: datetime = Field(default_factory=utc_now)
+    completed_at: datetime | None = None
 
 
 class GenerationRun(BaseModel):

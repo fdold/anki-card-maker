@@ -64,3 +64,21 @@ class RunCardResponse(BaseModel):
     rating: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class CreateExportRequest(BaseModel):
+    exporter_id: str = Field(..., min_length=1)
+    card_ids: list[str] = Field(default_factory=list)
+
+
+class ExportResponse(BaseModel):
+    export_id: str
+    run_id: str
+    exporter_id: str
+    card_ids: list[str] = Field(default_factory=list)
+    filename: str
+    media_type: str
+    status: str
+    created_at: datetime
+    completed_at: datetime | None = None
+    card_count: int = Field(default=0, ge=0)

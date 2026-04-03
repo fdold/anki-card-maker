@@ -1,22 +1,26 @@
 import logging
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from backend.api.schemas import (
     CreateRunRequest,
+    CreateExportRequest,
     DocumentDetailResponse,
     DocumentSummaryResponse,
+    ExportResponse,
     RunCardResponse,
     RunDetailResponse,
     RunSummaryResponse,
     UploadDocumentRequest,
 )
 from backend.services.document_service import DocumentService
+from backend.services.export_service import ExportService
 from backend.services.registry import create_application_overview
 from backend.services.run_service import RunService
 from backend.storage.document_repository import InMemoryDocumentRepository
+from backend.storage.export_repository import InMemoryExportRepository
 from backend.storage.run_repository import InMemoryRunRepository
-from domain.models import GenerationRun, RunCard, StoredDocument
+from domain.models import ExportArtifact, GenerationRun, RunCard, StoredDocument
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +87,21 @@ def _build_run_card(card: RunCard) -> RunCardResponse:
     )
 
 
+def _build_export_response(export_artifact: ExportArtifact) -> ExportResponse:
+    return ExportResponse(
+        export_id=export_artifact.export_id,
+        run_id=export_artifact.run_id,
+        exporter_id=export_artifact.exporter_id,
+        card_ids=list(export_artifact.card_ids),
+        filename=export_artifact.filename,
+        media_type=export_artifact.media_type,
+        status=export_artifact.status,
+        created_at=export_artifact.created_at,
+        completed_at=export_artifact.completed_at,
+        card_count=len(export_artifact.card_ids),
+    )
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Anki Card Maker API",
@@ -91,10 +110,16 @@ def create_app() -> FastAPI:
     )
     document_repository = InMemoryDocumentRepository()
     run_repository = InMemoryRunRepository()
+    export_repository = InMemoryExportRepository()
     app.state.document_service = DocumentService(document_repository=document_repository)
     app.state.run_service = RunService(
         document_repository=document_repository,
         run_repository=run_repository,
+    )
+    app.state.export_service = ExportService(
+        run_repository=run_repository,
+        export_repository=export_repository,
+        document_repository=document_repository,
     )
 
     @app.get("/health")
@@ -178,6 +203,48 @@ def create_app() -> FastAPI:
         if run is None:
             raise HTTPException(status_code=404, detail=f"Unknown run: {run_id}")
         return [_build_run_card(card) for card in run.cards]
+
+    @app.post(
+        "/runs/{run_id}/exports",
+        response_model=ExportResponse,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def create_export(
+        run_id: str,
+        request: CreateExportRequest,
+        http_request: Request,
+    ) -> ExportResponse:
+        try:
+            export_artifact = http_request.app.state.export_service.create_export(
+                run_id=run_id,
+                exporter_id=request.exporter_id,
+                card_ids=request.card_ids,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _build_export_response(export_artifact)
+
+    @app.get("/exports/{export_id}", response_model=ExportResponse)
+    def get_export(export_id: str, http_request: Request) -> ExportResponse:
+        export_artifact = http_request.app.state.export_service.get_export(export_id)
+        if export_artifact is None:
+            raise HTTPException(status_code=404, detail=f"Unknown export: {export_id}")
+        return _build_export_response(export_artifact)
+
+    @app.get("/exports/{export_id}/download")
+    def download_export(export_id: str, http_request: Request) -> Response:
+        export_artifact = http_request.app.state.export_service.get_export(export_id)
+        if export_artifact is None:
+            raise HTTPException(status_code=404, detail=f"Unknown export: {export_id}")
+        return Response(
+            content=export_artifact.content,
+            media_type=export_artifact.media_type,
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{export_artifact.filename}"'
+                )
+            },
+        )
 
     return app
 
