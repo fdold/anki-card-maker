@@ -7,7 +7,9 @@ from domain.models import (
     GenerationRun,
     ParsedContent,
     PluginManifest,
+    RunCard,
     SourceReference,
+    StoredDocument,
     TextBlock,
 )
 
@@ -18,6 +20,8 @@ __all__ = [
     "GenerationRun",
     "ParsedContent",
     "PluginManifest",
+    "RunCard",
     "SourceReference",
+    "StoredDocument",
     "TextBlock",
 ]

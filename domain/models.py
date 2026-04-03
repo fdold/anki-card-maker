@@ -1,4 +1,11 @@
+from datetime import datetime, timezone
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class SourceReference(BaseModel):
@@ -26,6 +33,16 @@ class ParsedContent(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class StoredDocument(BaseModel):
+    document_id: str
+    filename: str
+    title: str
+    source_type: str
+    content: str
+    parsed_content: ParsedContent | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class PluginManifest(BaseModel):
     plugin_id: str
     name: str
@@ -43,6 +60,22 @@ class CardCandidate(BaseModel):
     workflow_plugin_id: str
 
 
+class RunCard(BaseModel):
+    card_id: str
+    run_id: str
+    front: str
+    back: str
+    source: SourceReference
+    tags: list[str] = Field(default_factory=list)
+    workflow_plugin_id: str
+    original_front: str
+    original_back: str
+    status: Literal["active", "edited", "deleted", "accepted", "rejected"] = "active"
+    rating: Literal["good", "mixed", "bad"] | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class ExportableAnkiCard(BaseModel):
     front: str
     back: str
@@ -52,6 +85,12 @@ class ExportableAnkiCard(BaseModel):
 class GenerationRun(BaseModel):
     run_id: str
     plugin_id: str
-    document_id: str
-    cards: list[CardCandidate] = Field(default_factory=list)
+    document_id: str | None = None
+    document_ids: list[str] = Field(default_factory=list)
+    status: Literal["pending", "running", "completed", "failed"] = "completed"
+    workflow_config: dict[str, object] = Field(default_factory=dict)
+    cards: list[RunCard] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    completed_at: datetime | None = None
