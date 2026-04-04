@@ -33,6 +33,7 @@ packages = [
   "backend.exporters",
   "backend.storage",
   "backend.models",
+  "backend.models.providers",
   "domain",
   "frontend",
   "plugins",
