@@ -41,6 +41,10 @@ def test_overview_exposes_workflows_exporters_and_api_resources() -> None:
     assert payload["supported_input_formats"] == ["txt"]
     assert payload["available_workflow_plugins"][0]["plugin_id"] == "basic_text_workflow"
     assert "prompt_refine_selected" in payload["available_workflow_plugins"][0]["supported_operations"]
+    assert any(
+        plugin["plugin_id"] == "ollama_text_workflow"
+        for plugin in payload["available_workflow_plugins"]
+    )
     assert payload["available_exporters"][0]["exporter_id"] == "csv"
     assert payload["available_exporters"][0]["media_type"] == "text/csv"
     assert "/documents" in payload["api_resources"]

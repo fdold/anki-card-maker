@@ -4,7 +4,9 @@ from typing import Callable
 from backend.exporters.csv_exporter import export_cards_to_csv
 from backend.pipeline.parsers.txt_parser import parse_txt_document
 from domain.models import ExportableAnkiCard
+from plugins.base import WorkflowPlugin
 from plugins.workflows.basic_text_workflow import BasicTextWorkflowPlugin
+from plugins.workflows.ollama_text_workflow import OllamaTextWorkflowPlugin
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,8 +47,8 @@ def get_exporter(exporter_id: str) -> ExporterDefinition:
         raise ValueError(f"Unsupported exporter: {exporter_id}") from exc
 
 
-def list_workflow_plugins() -> list[BasicTextWorkflowPlugin]:
-    return [BasicTextWorkflowPlugin()]
+def list_workflow_plugins() -> list[WorkflowPlugin]:
+    return [BasicTextWorkflowPlugin(), OllamaTextWorkflowPlugin()]
 
 
 def list_exporters() -> list[ExporterDefinition]:
