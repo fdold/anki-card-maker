@@ -46,8 +46,20 @@ class RunSummaryResponse(BaseModel):
     completed_at: datetime | None = None
 
 
+class RunModelInvocationResponse(BaseModel):
+    invocation_id: str
+    profile_id: str
+    provider: str
+    model_name: str
+    purpose: str
+    status: str
+    latency_ms: int | None = None
+    error_message: str | None = None
+
+
 class RunDetailResponse(RunSummaryResponse):
     document_id: str | None = None
+    model_invocations: list[RunModelInvocationResponse] = Field(default_factory=list)
 
 
 class RunCardResponse(BaseModel):

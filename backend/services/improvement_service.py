@@ -1,7 +1,7 @@
 import logging
 from uuid import uuid4
 
-from backend.models import ModelGateway, build_model_gateway
+from backend.models import ModelGateway, ModelInvocationRecord, build_model_gateway
 from backend.services.registry import get_workflow_plugin
 from backend.storage.run_repository import InMemoryRunRepository
 from domain.models import (
@@ -10,6 +10,7 @@ from domain.models import (
     ImprovementBatch,
     ImprovementRecord,
     RunCard,
+    RunModelInvocation,
     WorkflowImprovementRequest,
     utc_now,
 )
@@ -204,11 +205,21 @@ class ImprovementService:
             config,
             context,
         )
-        self._model_gateway.consume_invocations()
+        new_model_invocations = self._to_run_model_invocations(
+            self._model_gateway.consume_invocations()
+        )
 
         updated_run = run
         for improved_card in improved_cards:
             updated_run = self._replace_card(updated_run, improved_card)
+        updated_run = updated_run.model_copy(
+            update={
+                "model_invocations": [
+                    *updated_run.model_invocations,
+                    *new_model_invocations,
+                ]
+            }
+        )
 
         summary_suffix = (
             f"{len(improved_cards)} selected cards"
@@ -252,3 +263,21 @@ class ImprovementService:
             for card in run.cards
         ]
         return run.model_copy(update={"cards": updated_cards, "updated_at": utc_now()})
+
+    @staticmethod
+    def _to_run_model_invocations(
+        invocations: list[ModelInvocationRecord],
+    ) -> list[RunModelInvocation]:
+        return [
+            RunModelInvocation(
+                invocation_id=str(uuid4()),
+                profile_id=invocation.profile_id,
+                provider=invocation.provider,
+                model_name=invocation.model_name,
+                purpose=invocation.purpose,
+                status=invocation.status,
+                latency_ms=invocation.latency_ms,
+                error_message=invocation.error_message,
+            )
+            for invocation in invocations
+        ]

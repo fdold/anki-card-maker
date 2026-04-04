@@ -12,6 +12,7 @@ CardStatus = Literal["active", "edited", "deleted", "accepted", "rejected"]
 CardRating = Literal["good", "mixed", "bad"]
 RunStatus = Literal["pending", "running", "completed", "failed"]
 ExportStatus = Literal["pending", "completed", "failed"]
+ModelInvocationStatus = Literal["completed", "failed"]
 ImprovementActionType = Literal[
     "edit_card",
     "delete_card",
@@ -141,6 +142,17 @@ class ExportArtifact(BaseModel):
     completed_at: datetime | None = None
 
 
+class RunModelInvocation(BaseModel):
+    invocation_id: str
+    profile_id: str
+    provider: str
+    model_name: str
+    purpose: str
+    status: ModelInvocationStatus
+    latency_ms: int | None = None
+    error_message: str | None = None
+
+
 class GenerationRun(BaseModel):
     run_id: str
     plugin_id: str
@@ -151,6 +163,7 @@ class GenerationRun(BaseModel):
     workflow_config: dict[str, object] = Field(default_factory=dict)
     cards: list[RunCard] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    model_invocations: list[RunModelInvocation] = Field(default_factory=list)
     improvement_history: list[ImprovementRecord] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

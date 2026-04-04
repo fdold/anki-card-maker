@@ -13,6 +13,7 @@ from backend.api.schemas import (
     ImprovementActionRequest,
     RunCardResponse,
     RunDetailResponse,
+    RunModelInvocationResponse,
     RunSummaryResponse,
     UploadDocumentRequest,
 )
@@ -32,6 +33,7 @@ from domain.models import (
     ImprovementBatch,
     ImprovementRecord,
     RunCard,
+    RunModelInvocation,
     StoredDocument,
 )
 
@@ -79,6 +81,25 @@ def _build_run_detail(run: GenerationRun) -> RunDetailResponse:
     return RunDetailResponse(
         **summary.model_dump(),
         document_id=run.document_id,
+        model_invocations=[
+            _build_run_model_invocation(invocation)
+            for invocation in run.model_invocations
+        ],
+    )
+
+
+def _build_run_model_invocation(
+    invocation: RunModelInvocation,
+) -> RunModelInvocationResponse:
+    return RunModelInvocationResponse(
+        invocation_id=invocation.invocation_id,
+        profile_id=invocation.profile_id,
+        provider=invocation.provider,
+        model_name=invocation.model_name,
+        purpose=invocation.purpose,
+        status=invocation.status,
+        latency_ms=invocation.latency_ms,
+        error_message=invocation.error_message,
     )
 
 

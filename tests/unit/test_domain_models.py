@@ -1,4 +1,10 @@
-from domain.models import GenerationRun, RunCard, SourceReference, StoredDocument
+from domain.models import (
+    GenerationRun,
+    RunCard,
+    RunModelInvocation,
+    SourceReference,
+    StoredDocument,
+)
 
 
 def test_stored_document_can_embed_parsed_content_metadata() -> None:
@@ -48,3 +54,26 @@ def test_generation_run_supports_multiple_documents_and_status_tracking() -> Non
     assert generation_run.document_ids == ["doc-1", "doc-2"]
     assert generation_run.status == "pending"
     assert generation_run.workflow_config["max_cards"] == 5
+
+
+def test_generation_run_can_store_model_invocation_summaries() -> None:
+    generation_run = GenerationRun(
+        run_id="run-1",
+        plugin_id="ollama_text_workflow",
+        document_id="doc-1",
+        document_ids=["doc-1"],
+        model_invocations=[
+            RunModelInvocation(
+                invocation_id="inv-1",
+                profile_id="ollama_generation_default",
+                provider="ollama",
+                model_name="qwen3:8b",
+                purpose="card_generation",
+                status="completed",
+                latency_ms=120,
+            )
+        ],
+    )
+
+    assert len(generation_run.model_invocations) == 1
+    assert generation_run.model_invocations[0].profile_id == "ollama_generation_default"

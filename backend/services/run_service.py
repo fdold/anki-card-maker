@@ -1,11 +1,17 @@
 import logging
 from uuid import uuid4
 
-from backend.models import ModelGateway, build_model_gateway
+from backend.models import ModelGateway, ModelInvocationRecord, build_model_gateway
 from backend.services.registry import get_workflow_plugin
 from backend.storage.document_repository import InMemoryDocumentRepository
 from backend.storage.run_repository import InMemoryRunRepository
-from domain.models import GenerationRun, RunCard, StoredDocument, utc_now
+from domain.models import (
+    GenerationRun,
+    RunCard,
+    RunModelInvocation,
+    StoredDocument,
+    utc_now,
+)
 from plugins.base import WorkflowExecutionContext
 
 logger = logging.getLogger(__name__)
@@ -89,13 +95,16 @@ class RunService:
                         original_back=card.back,
                     )
                 )
-        self._model_gateway.consume_invocations()
+        model_invocations = self._to_run_model_invocations(
+            self._model_gateway.consume_invocations()
+        )
 
         completed_at = utc_now()
         completed_run = generation_run.model_copy(
             update={
                 "cards": generated_cards,
                 "warnings": warnings,
+                "model_invocations": model_invocations,
                 "status": "completed",
                 "updated_at": completed_at,
                 "completed_at": completed_at,
@@ -121,3 +130,21 @@ class RunService:
         if stored_document is None:
             raise ValueError(f"Unknown document: {document_id}")
         return stored_document
+
+    @staticmethod
+    def _to_run_model_invocations(
+        invocations: list[ModelInvocationRecord],
+    ) -> list[RunModelInvocation]:
+        return [
+            RunModelInvocation(
+                invocation_id=str(uuid4()),
+                profile_id=invocation.profile_id,
+                provider=invocation.provider,
+                model_name=invocation.model_name,
+                purpose=invocation.purpose,
+                status=invocation.status,
+                latency_ms=invocation.latency_ms,
+                error_message=invocation.error_message,
+            )
+            for invocation in invocations
+        ]
