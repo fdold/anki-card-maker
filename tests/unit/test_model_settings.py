@@ -66,3 +66,12 @@ def test_load_model_settings_rejects_duplicate_profile_ids(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="Duplicate model profile ids: duplicate"):
         load_model_settings(profiles_file=profiles_file)
+
+
+def test_development_model_profiles_file_is_valid() -> None:
+    settings = load_model_settings(profiles_file="docker/model_profiles.dev.json")
+
+    assert [profile.profile_id for profile in settings.profiles] == [
+        "ollama_generation_default",
+        "ollama_improvement_default",
+    ]

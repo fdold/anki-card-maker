@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
 
+from backend.models import list_model_profiles
 from backend.exporters.csv_exporter import export_cards_to_csv
 from backend.pipeline.parsers.txt_parser import parse_txt_document
 from domain.models import ExportableAnkiCard
@@ -65,10 +66,12 @@ def list_exporters() -> list[ExporterDefinition]:
 def create_application_overview() -> dict[str, object]:
     workflows = list_workflow_plugins()
     exporters = list_exporters()
+    model_profiles = list_model_profiles()
     return {
         "active_workflow_example": workflows[0].manifest.model_dump(),
         "supported_input_formats": ["txt"],
         "available_workflow_plugins": [workflow.manifest.model_dump() for workflow in workflows],
+        "available_model_profiles": [profile.model_dump() for profile in model_profiles],
         "available_exporters": [
             {
                 "exporter_id": exporter.exporter_id,

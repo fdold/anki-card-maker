@@ -45,6 +45,7 @@ def test_overview_exposes_workflows_exporters_and_api_resources() -> None:
         plugin["plugin_id"] == "ollama_text_workflow"
         for plugin in payload["available_workflow_plugins"]
     )
+    assert payload["available_model_profiles"] == []
     assert payload["available_exporters"][0]["exporter_id"] == "csv"
     assert payload["available_exporters"][0]["media_type"] == "text/csv"
     assert "/documents" in payload["api_resources"]

@@ -1,0 +1,24 @@
+[
+  {
+    "profile_id": "ollama_generation_default",
+    "provider": "ollama",
+    "model_name": "qwen3:8b",
+    "base_url": "http://ollama-default:11434",
+    "timeout_seconds": 120,
+    "supports_structured_output": true,
+    "default_options": {
+      "temperature": 0.2
+    }
+  },
+  {
+    "profile_id": "ollama_improvement_default",
+    "provider": "ollama",
+    "model_name": "qwen3:8b",
+    "base_url": "http://ollama-default:11434",
+    "timeout_seconds": 120,
+    "supports_structured_output": true,
+    "default_options": {
+      "temperature": 0.1
+    }
+  }
+]

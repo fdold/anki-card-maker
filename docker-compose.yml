@@ -1,15 +1,31 @@
 services:
+  ollama-default:
+    image: ollama/ollama:latest
+    container_name: anki-card-maker-ollama-default
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-default-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
   backend:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
     container_name: anki-card-maker-backend
+    depends_on:
+      - ollama-default
     ports:
       - "8000:8000"
     volumes:
       - ./:/app
     environment:
       PYTHONUNBUFFERED: "1"
+      ANKI_CARD_MAKER_MODEL_PROFILES_FILE: "/app/docker/model_profiles.dev.json"
     command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
@@ -27,3 +43,6 @@ services:
     ports:
       - "8501:8501"
     command: uvicorn frontend.web:app --host 0.0.0.0 --port 8501 --reload
+
+volumes:
+  ollama-default-data:

@@ -19,6 +19,18 @@ docker compose up --build
 ```
 
 Danach stehen Backend und eine Web-UI direkt bereit.
+Ollama wird im Compose-Setup nun in einem eigenen Container gestartet.
+
+Das Development-Backend liest seine Model-Profile aus
+`docker/model_profiles.dev.json`. Standardmaessig sind dort aktuell die Profile
+`ollama_generation_default` und `ollama_improvement_default` fuer
+`qwen3:8b` hinterlegt.
+
+Bevor du den Ollama-Workflow verwendest, ziehe das Modell einmal im Container:
+
+```bash
+docker compose exec ollama-default ollama pull qwen3:8b
+```
 
 Web-UI im Browser:
 
@@ -136,6 +148,10 @@ API-Endpunkte:
 - `POST /runs/{run_id}/exports`
 - `GET /exports/{export_id}`
 - `GET /exports/{export_id}/download`
+
+Der Endpoint `GET /overview` zeigt jetzt auch die geladenen
+`available_model_profiles`, sofern das Backend mit einer Model-Profile-Datei
+konfiguriert wurde.
 
 ## Docker Test Flow
 
