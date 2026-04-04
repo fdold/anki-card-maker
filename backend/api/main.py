@@ -16,6 +16,7 @@ from backend.api.schemas import (
     RunSummaryResponse,
     UploadDocumentRequest,
 )
+from backend.models import build_model_gateway
 from backend.services.document_service import DocumentService
 from backend.services.export_service import ExportService
 from backend.services.improvement_service import ImprovementService
@@ -148,12 +149,17 @@ def create_app() -> FastAPI:
     document_repository = InMemoryDocumentRepository()
     run_repository = InMemoryRunRepository()
     export_repository = InMemoryExportRepository()
+    model_gateway = build_model_gateway()
     app.state.document_service = DocumentService(document_repository=document_repository)
     app.state.run_service = RunService(
         document_repository=document_repository,
         run_repository=run_repository,
+        model_gateway=model_gateway,
     )
-    app.state.improvement_service = ImprovementService(run_repository=run_repository)
+    app.state.improvement_service = ImprovementService(
+        run_repository=run_repository,
+        model_gateway=model_gateway,
+    )
     app.state.export_service = ExportService(
         run_repository=run_repository,
         export_repository=export_repository,

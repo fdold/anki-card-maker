@@ -1,10 +1,12 @@
 import logging
 from uuid import uuid4
 
+from backend.models import ModelGateway, build_model_gateway
 from backend.services.registry import get_workflow_plugin
 from backend.storage.document_repository import InMemoryDocumentRepository
 from backend.storage.run_repository import InMemoryRunRepository
 from domain.models import GenerationRun, RunCard, StoredDocument, utc_now
+from plugins.base import WorkflowExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +17,11 @@ class RunService:
         *,
         document_repository: InMemoryDocumentRepository,
         run_repository: InMemoryRunRepository | None = None,
+        model_gateway: ModelGateway | None = None,
     ) -> None:
         self._document_repository = document_repository
         self._run_repository = run_repository or InMemoryRunRepository()
+        self._model_gateway = model_gateway or build_model_gateway()
 
     def create_run(
         self,
@@ -51,6 +55,12 @@ class RunService:
             len(stored_documents),
         )
         config = workflow.config_model.model_validate(workflow_config or {})
+        self._model_gateway.consume_invocations()
+        context = WorkflowExecutionContext(
+            run_id=generation_run.run_id,
+            models=self._model_gateway,
+            metadata={"workflow_plugin_id": workflow.manifest.plugin_id},
+        )
 
         generated_cards: list[RunCard] = []
         warnings: list[str] = []
@@ -60,7 +70,11 @@ class RunService:
                     f"Document '{stored_document.document_id}' is missing parsed content."
                 )
             warnings.extend(stored_document.parsed_content.warnings)
-            cards = workflow.generate_cards(stored_document.parsed_content, config)
+            cards = workflow.generate_cards(
+                stored_document.parsed_content,
+                config,
+                context,
+            )
             for card in cards:
                 generated_cards.append(
                     RunCard(
@@ -75,6 +89,7 @@ class RunService:
                         original_back=card.back,
                     )
                 )
+        self._model_gateway.consume_invocations()
 
         completed_at = utc_now()
         completed_run = generation_run.model_copy(

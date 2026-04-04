@@ -1,6 +1,7 @@
 import logging
 from uuid import uuid4
 
+from backend.models import ModelGateway, build_model_gateway
 from backend.services.registry import get_workflow_plugin
 from backend.storage.run_repository import InMemoryRunRepository
 from domain.models import (
@@ -12,13 +13,19 @@ from domain.models import (
     WorkflowImprovementRequest,
     utc_now,
 )
+from plugins.base import WorkflowExecutionContext
 
 logger = logging.getLogger(__name__)
 
 
 class ImprovementService:
-    def __init__(self, run_repository: InMemoryRunRepository) -> None:
+    def __init__(
+        self,
+        run_repository: InMemoryRunRepository,
+        model_gateway: ModelGateway | None = None,
+    ) -> None:
         self._run_repository = run_repository
+        self._model_gateway = model_gateway or build_model_gateway()
 
     def apply_improvements(self, batch: ImprovementBatch) -> GenerationRun:
         run = self._run_repository.get(batch.run_id)
@@ -181,6 +188,12 @@ class ImprovementService:
 
         selected_cards = self._get_cards_for_plugin_improvement(run, action)
         config = workflow.config_model.model_validate(run.workflow_config)
+        self._model_gateway.consume_invocations()
+        context = WorkflowExecutionContext(
+            run_id=run.run_id,
+            models=self._model_gateway,
+            metadata={"workflow_plugin_id": run.plugin_id},
+        )
         improved_cards = workflow.apply_improvement(
             WorkflowImprovementRequest(
                 action_type=action.action_type,
@@ -189,7 +202,9 @@ class ImprovementService:
                 cards=selected_cards,
             ),
             config,
+            context,
         )
+        self._model_gateway.consume_invocations()
 
         updated_run = run
         for improved_card in improved_cards:
