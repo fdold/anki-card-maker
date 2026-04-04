@@ -31,3 +31,5 @@ The old one-shot generation endpoint is no longer part of the backend API.
 - Central model/provider integrations belong in `backend/models/`.
 - Exporters stay dedicated backend modules and should not contain workflow logic.
 - The frontend CLI now uses the same multi-step API flow as the backend resources.
+- The target structure for centrally managed LLM and Ollama integration is
+  documented in `docs/llm_ollama_architecture.md`.
