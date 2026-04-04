@@ -13,6 +13,7 @@ from backend.models.base import (
     ModelUsage,
 )
 from backend.models.gateway import ModelGateway, StructuredModelResult
+from backend.models.providers import ModelProvider, OllamaProvider
 from backend.models.registry import (
     build_model_gateway,
     build_provider_registry,
@@ -33,11 +34,13 @@ __all__ = [
     "ModelInvocationRecord",
     "ModelMessage",
     "ModelProfile",
+    "ModelProvider",
     "ModelProviderError",
     "ModelRequest",
     "ModelResponse",
     "ModelResponseValidationError",
     "ModelSettings",
+    "OllamaProvider",
     "ModelUsage",
     "StructuredModelResult",
     "build_model_gateway",

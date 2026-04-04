@@ -99,6 +99,7 @@ class ModelGateway:
             purpose=purpose,
             messages=list(messages),
             options=profile.default_options.merged_with(options),
+            response_schema=response_model.model_json_schema(),
             metadata=dict(metadata or {}),
         )
 

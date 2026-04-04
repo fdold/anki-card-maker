@@ -2,6 +2,7 @@ from collections.abc import Callable, Mapping
 
 from backend.models.gateway import ModelGateway
 from backend.models.providers.base import ModelProvider
+from backend.models.providers.ollama import OllamaProvider
 from backend.models.settings import ModelSettings, load_model_settings
 
 ProviderFactory = Callable[[], ModelProvider]
@@ -20,7 +21,10 @@ def get_model_profile(profile_id: str, settings: ModelSettings | None = None):
 def build_provider_registry(
     provider_factories: Mapping[str, ProviderFactory] | None = None,
 ) -> dict[str, ModelProvider]:
-    resolved_factories = dict(provider_factories or {})
+    resolved_factories = {
+        "ollama": OllamaProvider,
+        **dict(provider_factories or {}),
+    }
     return {
         provider_name: factory()
         for provider_name, factory in resolved_factories.items()

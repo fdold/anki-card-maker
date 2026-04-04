@@ -54,6 +54,7 @@ class ModelRequest(BaseModel):
     purpose: str = Field(..., min_length=1, description="Why the model is being used.")
     messages: list[ModelMessage] = Field(default_factory=list)
     options: ModelGenerationOptions = Field(default_factory=ModelGenerationOptions)
+    response_schema: dict[str, object] | None = None
     metadata: dict[str, object] = Field(default_factory=dict)
 
 
