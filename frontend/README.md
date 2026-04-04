@@ -1,6 +1,13 @@
 # Frontend
 
-The frontend currently provides a CLI for the backend's resource-based API.
+The frontend now provides both a CLI and a browser-based web UI for the backend's resource-based API.
+
+Web UI:
+
+- `docker compose up --build` starts the frontend app on `http://localhost:8501`
+- the browser UI proxies to the backend API and supports document uploads, run creation, card inspection, improvements, export creation, export inspection, and export download
+
+CLI:
 
 Available commands:
 

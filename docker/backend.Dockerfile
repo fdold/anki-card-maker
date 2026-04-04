@@ -13,6 +13,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
     pip install -e .[dev]
 
-EXPOSE 8000
+EXPOSE 8000 8501
 
 CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

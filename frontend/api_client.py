@@ -5,6 +5,17 @@ from urllib import error, request
 class ApiClientError(Exception):
     """Raised when the frontend client cannot complete an API request."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        details: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.details = details
+
 
 def _request_json(
     api_url: str,
@@ -26,7 +37,11 @@ def _request_json(
             return json.loads(response.read().decode("utf-8"))
     except error.HTTPError as exc:
         details = exc.read().decode("utf-8")
-        raise ApiClientError(f"API request failed with status {exc.code}: {details}") from exc
+        raise ApiClientError(
+            f"API request failed with status {exc.code}: {details}",
+            status_code=exc.code,
+            details=details,
+        ) from exc
     except error.URLError as exc:
         raise ApiClientError(f"Could not reach backend API: {exc.reason}") from exc
 
@@ -47,9 +62,21 @@ def _request_text(
             return response.read().decode("utf-8")
     except error.HTTPError as exc:
         details = exc.read().decode("utf-8")
-        raise ApiClientError(f"API request failed with status {exc.code}: {details}") from exc
+        raise ApiClientError(
+            f"API request failed with status {exc.code}: {details}",
+            status_code=exc.code,
+            details=details,
+        ) from exc
     except error.URLError as exc:
         raise ApiClientError(f"Could not reach backend API: {exc.reason}") from exc
+
+
+def get_health(api_base_url: str) -> dict[str, object]:
+    response = _request_json(
+        f"{api_base_url.rstrip('/')}/health",
+        method="GET",
+    )
+    return dict(response)
 
 
 def upload_document(api_base_url: str, payload: dict[str, object]) -> dict[str, object]:

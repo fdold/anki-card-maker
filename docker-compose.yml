@@ -24,4 +24,6 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       ANKI_CARD_MAKER_API_URL: "http://backend:8000"
-    command: tail -f /dev/null
+    ports:
+      - "8501:8501"
+    command: uvicorn frontend.web:app --host 0.0.0.0 --port 8501 --reload

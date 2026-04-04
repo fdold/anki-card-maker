@@ -18,7 +18,15 @@ Modular Python application for turning documents into Anki-compatible flashcards
 docker compose up --build
 ```
 
-Danach stehen Backend und ein CLI-Container direkt bereit.
+Danach stehen Backend und eine Web-UI direkt bereit.
+
+Web-UI im Browser:
+
+```bash
+open http://localhost:8501
+```
+
+Die Web-UI nutzt denselben Frontend-API-Client wie die CLI und deckt die vorhandenen FastAPI-Aktionen fuer Uploads, Run-Erstellung, Kartenansicht, Improvements und Exporte ab.
 
 TXT-Workflow per CLI testen:
 
@@ -34,6 +42,7 @@ anki-card-maker generate path/to/notes.txt --api-url http://localhost:8000 --plu
 
 Die CLI liegt im `frontend/` und spricht nur mit dem Backend-API-Endpoint.
 Parserwahl, TXT-Segmentierung, Workflow-Ausfuehrung und Export liegen im Backend.
+Die Browser-UI laeuft ebenfalls im `frontend/` und spricht ueber einen kleinen Frontend-Proxy mit denselben Backend-Ressourcen.
 Die CLI nutzt intern jetzt denselben Ressourcen-Flow wie die API:
 Dokument hochladen, Run erzeugen, Export erstellen und Ergebnis herunterladen.
 Der alte Kurzaufruf `anki-card-maker path/to/file.txt` bleibt als Abkuerzung fuer `generate` erhalten.
@@ -155,6 +164,14 @@ Export pruefen:
 ```bash
 cat test-data/exports/biology_basics.csv
 ```
+
+Browser-UI im Compose-Setup:
+
+```bash
+open http://localhost:8501
+```
+
+Dort koennen Dokumente hochgeladen, Runs erzeugt, Improvements angewendet und CSV-Exporte erstellt sowie heruntergeladen werden.
 
 ## Current Status
 

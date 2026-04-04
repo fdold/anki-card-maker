@@ -12,6 +12,7 @@ from frontend.api_client import (
     generate_cards_from_document,
     get_document,
     get_export,
+    get_health,
     get_overview,
     get_run,
     list_improvements,
@@ -113,6 +114,9 @@ def test_generate_cards_from_document_rejects_unsupported_output_types() -> None
 
 def test_resource_client_functions_call_expected_endpoints(monkeypatch) -> None:
     def fake_urlopen(api_request):
+        if api_request.full_url == "http://localhost:8000/health":
+            assert api_request.get_method() == "GET"
+            return DummyResponse('{"status": "ok"}')
         if api_request.full_url == "http://localhost:8000/overview":
             assert api_request.get_method() == "GET"
             return DummyResponse('{"status": "ok"}')
@@ -152,6 +156,7 @@ def test_resource_client_functions_call_expected_endpoints(monkeypatch) -> None:
 
     monkeypatch.setattr("frontend.api_client.request.urlopen", fake_urlopen)
 
+    assert get_health("http://localhost:8000") == {"status": "ok"}
     assert get_overview("http://localhost:8000") == {"status": "ok"}
     assert upload_document(
         "http://localhost:8000",
@@ -183,3 +188,32 @@ def test_resource_client_functions_call_expected_endpoints(monkeypatch) -> None:
     ) == {"export_id": "export-1"}
     assert get_export("http://localhost:8000", "export-1") == {"export_id": "export-1"}
     assert download_export("http://localhost:8000", "export-1") == "front,back,tags\nQ,A,tag\n"
+
+
+def test_api_client_error_exposes_status_code_and_details(monkeypatch) -> None:
+    class DummyHttpError(error.HTTPError):
+        def __init__(self) -> None:
+            super().__init__(
+                url="http://localhost:8000/documents",
+                code=400,
+                msg="Bad Request",
+                hdrs=None,
+                fp=None,
+            )
+
+        def read(self) -> bytes:
+            return b'{"detail":"Bad payload"}'
+
+    def fake_urlopen(_api_request):
+        raise DummyHttpError()
+
+    monkeypatch.setattr("frontend.api_client.request.urlopen", fake_urlopen)
+
+    with pytest.raises(ApiClientError) as exc_info:
+        upload_document(
+            "http://localhost:8000",
+            {"filename": "biology.txt", "content": "Cells"},
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.details == '{"detail":"Bad payload"}'
