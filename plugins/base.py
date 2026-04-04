@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
+from backend.models import ModelGateway
 from domain.models import (
     CardCandidate,
     ParsedContent,
@@ -12,6 +14,18 @@ from domain.models import (
 )
 
 WorkflowPluginConfigT = TypeVar("WorkflowPluginConfigT", bound=BaseModel)
+
+
+@dataclass(slots=True)
+class WorkflowExecutionContext:
+    run_id: str
+    models: ModelGateway | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
+
+    def require_models(self) -> ModelGateway:
+        if self.models is None:
+            raise ValueError("This workflow execution context does not provide model access.")
+        return self.models
 
 
 class WorkflowPlugin(ABC, Generic[WorkflowPluginConfigT]):
@@ -31,6 +45,7 @@ class WorkflowPlugin(ABC, Generic[WorkflowPluginConfigT]):
         self,
         parsed_content: ParsedContent,
         config: WorkflowPluginConfigT,
+        context: WorkflowExecutionContext | None = None,
     ) -> list[CardCandidate]:
         raise NotImplementedError
 
@@ -38,6 +53,7 @@ class WorkflowPlugin(ABC, Generic[WorkflowPluginConfigT]):
         self,
         request: WorkflowImprovementRequest,
         config: WorkflowPluginConfigT,
+        context: WorkflowExecutionContext | None = None,
     ) -> list[RunCard]:
         raise NotImplementedError(
             f"Workflow plugin '{self.manifest.plugin_id}' does not support "

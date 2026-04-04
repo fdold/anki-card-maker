@@ -8,7 +8,7 @@ from domain.models import (
     WorkflowImprovementRequest,
     utc_now,
 )
-from plugins.base import WorkflowPlugin
+from plugins.base import WorkflowExecutionContext, WorkflowPlugin
 
 
 class BasicTextWorkflowConfig(BaseModel):
@@ -31,6 +31,7 @@ class BasicTextWorkflowPlugin(WorkflowPlugin[BasicTextWorkflowConfig]):
         self,
         parsed_content: ParsedContent,
         config: BasicTextWorkflowConfig,
+        context: WorkflowExecutionContext | None = None,
     ) -> list[CardCandidate]:
         cards: list[CardCandidate] = []
         for block in parsed_content.blocks[: config.max_cards]:
@@ -51,6 +52,7 @@ class BasicTextWorkflowPlugin(WorkflowPlugin[BasicTextWorkflowConfig]):
         self,
         request: WorkflowImprovementRequest,
         config: BasicTextWorkflowConfig,
+        context: WorkflowExecutionContext | None = None,
     ) -> list[RunCard]:
         normalized_prompt = request.prompt.strip()
         lower_prompt = normalized_prompt.lower()
