@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from backend.models import ModelProviderError
 from backend.api.main import create_app
 
 
@@ -93,6 +94,37 @@ def test_runs_endpoints_create_run_and_expose_cards() -> None:
     assert len(cards) == 2
     assert cards[0]["run_id"] == run_id
     assert cards[0]["original_back"] == cards[0]["back"]
+
+
+def test_runs_endpoint_surfaces_ollama_provider_errors(monkeypatch) -> None:
+    client = TestClient(create_app())
+    upload_response = client.post(
+        "/documents",
+        json={
+            "filename": "biology.txt",
+            "content": "Cells are the basic unit of life.",
+        },
+    )
+    document_id = upload_response.json()["document_id"]
+
+    def explode_create_run(*args, **kwargs):
+        raise ModelProviderError(
+            "Ollama request failed for model 'qwen3:8b' with status 404: "
+            "model 'qwen3:8b' not found, try pulling it first"
+        )
+
+    monkeypatch.setattr(client.app.state.run_service, "create_run", explode_create_run)
+
+    response = client.post(
+        "/runs",
+        json={
+            "document_ids": [document_id],
+            "workflow_plugin_id": "ollama_text_workflow",
+        },
+    )
+
+    assert response.status_code == 502
+    assert "try pulling it first" in response.json()["detail"]
 
 
 def test_improvement_endpoints_apply_actions_and_list_history() -> None:

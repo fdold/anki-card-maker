@@ -114,3 +114,31 @@ def test_ollama_provider_wraps_transport_errors() -> None:
                 messages=[ModelMessage(role="user", content="Generate cards")],
             ),
         )
+
+
+def test_ollama_provider_surfaces_ollama_error_body_for_missing_models() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404,
+            json={"error": "model 'qwen3:8b' not found, try pulling it first"},
+        )
+
+    provider = build_provider_with_transport(handler)
+
+    with pytest.raises(
+        ModelProviderError,
+        match="model 'qwen3:8b' not found, try pulling it first",
+    ):
+        provider.generate(
+            ModelProfile(
+                profile_id="ollama_generation_default",
+                provider="ollama",
+                model_name="qwen3:8b",
+                base_url="http://ollama-default:11434",
+            ),
+            ModelRequest(
+                profile_id="ollama_generation_default",
+                purpose="card_generation",
+                messages=[ModelMessage(role="user", content="Generate cards")],
+            ),
+        )

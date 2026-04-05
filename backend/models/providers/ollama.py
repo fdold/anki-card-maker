@@ -41,10 +41,19 @@ class OllamaProvider(ModelProvider):
         try:
             with self._client_factory(profile.timeout_seconds) as client:
                 http_response = client.post(endpoint, json=payload)
-                http_response.raise_for_status()
         except httpx.HTTPError as exc:
             raise ModelProviderError(
-                f"Ollama request failed for model '{profile.model_name}'."
+                f"Ollama request failed for model '{profile.model_name}': {exc}."
+            ) from exc
+
+        try:
+            http_response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            response_details = self._extract_error_details(http_response)
+            raise ModelProviderError(
+                "Ollama request failed for model "
+                f"'{profile.model_name}' with status {http_response.status_code}: "
+                f"{response_details}"
             ) from exc
 
         try:
@@ -132,3 +141,21 @@ class OllamaProvider(ModelProvider):
         if not isinstance(duration_ns, int):
             return None
         return int(duration_ns / 1_000_000)
+
+    @staticmethod
+    def _extract_error_details(http_response: httpx.Response) -> str:
+        try:
+            payload = http_response.json()
+        except ValueError:
+            payload = None
+
+        if isinstance(payload, dict):
+            error_message = payload.get("error")
+            if isinstance(error_message, str) and error_message.strip():
+                return error_message.strip()
+
+        response_text = http_response.text.strip()
+        if response_text:
+            return response_text
+
+        return "No error details returned by Ollama."

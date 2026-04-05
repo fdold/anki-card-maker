@@ -17,7 +17,11 @@ from backend.api.schemas import (
     RunSummaryResponse,
     UploadDocumentRequest,
 )
-from backend.models import build_model_gateway
+from backend.models import (
+    ModelProviderError,
+    ModelResponseValidationError,
+    build_model_gateway,
+)
 from backend.services.document_service import DocumentService
 from backend.services.export_service import ExportService
 from backend.services.improvement_service import ImprovementService
@@ -248,6 +252,8 @@ def create_app() -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except (ModelProviderError, ModelResponseValidationError) as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         return _build_run_detail(run)
 
     @app.get("/runs", response_model=list[RunSummaryResponse])
@@ -287,6 +293,8 @@ def create_app() -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except (ModelProviderError, ModelResponseValidationError) as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         return _build_run_detail(updated_run)
 
     @app.get(
