@@ -13,6 +13,16 @@ from backend.models.base import (
     ModelUsage,
 )
 from backend.models.gateway import ModelGateway, StructuredModelResult
+from backend.models.ollama_init import (
+    OLLAMA_INIT_BASE_URL_ENV,
+    OLLAMA_INIT_DELAY_SECONDS_ENV,
+    OLLAMA_INIT_MAX_ATTEMPTS_ENV,
+    ensure_models_present,
+    list_installed_models,
+    normalize_ollama_base_url,
+    resolve_models_for_base_url,
+    wait_for_ollama,
+)
 from backend.models.providers import ModelProvider, OllamaProvider
 from backend.models.registry import (
     build_model_gateway,
@@ -28,6 +38,9 @@ from backend.models.settings import (
 
 __all__ = [
     "MODEL_PROFILES_FILE_ENV",
+    "OLLAMA_INIT_BASE_URL_ENV",
+    "OLLAMA_INIT_DELAY_SECONDS_ENV",
+    "OLLAMA_INIT_MAX_ATTEMPTS_ENV",
     "ModelGenerationOptions",
     "ModelGateway",
     "ModelInvocation",
@@ -45,7 +58,12 @@ __all__ = [
     "StructuredModelResult",
     "build_model_gateway",
     "build_provider_registry",
+    "ensure_models_present",
     "get_model_profile",
+    "list_installed_models",
     "list_model_profiles",
     "load_model_settings",
+    "normalize_ollama_base_url",
+    "resolve_models_for_base_url",
+    "wait_for_ollama",
 ]

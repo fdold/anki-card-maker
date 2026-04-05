@@ -20,16 +20,19 @@ docker compose up --build
 
 Danach stehen Backend und eine Web-UI direkt bereit.
 Ollama wird im Compose-Setup nun in einem eigenen Container gestartet.
+Ein einmaliger Init-Service zieht beim Compose-Start automatisch alle in
+`docker/model_profiles.dev.json` konfigurierten Ollama-Modelle fuer
+`ollama-default`, bevor das Backend startet.
 
 Das Development-Backend liest seine Model-Profile aus
 `docker/model_profiles.dev.json`. Standardmaessig sind dort aktuell die Profile
 `ollama_generation_default` und `ollama_improvement_default` fuer
 `qwen3:8b` hinterlegt.
-
-Bevor du den Ollama-Workflow verwendest, ziehe das Modell einmal im Container:
+Beim ersten Start kann dieser Schritt deutlich laenger dauern, weil das Modell
+zuerst heruntergeladen wird. Den Fortschritt kannst du bei Bedarf mitverfolgen:
 
 ```bash
-docker compose exec ollama-default ollama pull qwen3:8b
+docker compose logs -f ollama-init
 ```
 
 Web-UI im Browser:
@@ -162,6 +165,12 @@ Alles starten:
 
 ```bash
 docker compose up --build
+```
+
+Falls du pruefen willst, welche Modelle nach dem Init verfuegbar sind:
+
+```bash
+docker compose exec ollama-default ollama list
 ```
 
 Dann die CLI direkt im Frontend-Container verwenden:

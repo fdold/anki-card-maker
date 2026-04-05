@@ -12,13 +12,33 @@ services:
       timeout: 10s
       retries: 10
 
+  ollama-init:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: anki-card-maker-ollama-init
+    depends_on:
+      ollama-default:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    environment:
+      PYTHONUNBUFFERED: "1"
+      ANKI_CARD_MAKER_MODEL_PROFILES_FILE: "/app/docker/model_profiles.dev.json"
+      OLLAMA_INIT_BASE_URL: "http://ollama-default:11434"
+    command: python -m backend.models.ollama_init
+    restart: "no"
+
   backend:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
     container_name: anki-card-maker-backend
     depends_on:
-      - ollama-default
+      ollama-default:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     volumes:
@@ -34,7 +54,8 @@ services:
       dockerfile: docker/backend.Dockerfile
     container_name: anki-card-maker-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     volumes:
       - ./:/app
     environment:
