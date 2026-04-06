@@ -4,7 +4,7 @@
     "provider": "ollama",
     "model_name": "qwen3:8b",
     "base_url": "http://ollama-default:11434",
-    "timeout_seconds": 120,
+    "timeout_seconds": 600,
     "supports_structured_output": true,
     "default_options": {
       "temperature": 0.2
@@ -15,7 +15,7 @@
     "provider": "ollama",
     "model_name": "qwen3:8b",
     "base_url": "http://ollama-default:11434",
-    "timeout_seconds": 120,
+    "timeout_seconds": 600,
     "supports_structured_output": true,
     "default_options": {
       "temperature": 0.1

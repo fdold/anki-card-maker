@@ -37,6 +37,9 @@ docker compose logs -f ollama-init
 
 Der `ollama-init`-Service gibt dabei Status- und Fortschrittszeilen aus, waehrend
 das Modell geladen wird.
+Während längerer Ollama-Generierungen loggen Backend und Workflow jetzt zudem
+den Start der Anfrage, den aktuellen Dokument-/Block-Status und den Abschluss
+der Modellantwort.
 
 Web-UI im Browser:
 
@@ -200,6 +203,11 @@ open http://localhost:8501
 ```
 
 Dort koennen Dokumente hochgeladen, Runs erzeugt, Improvements angewendet und CSV-Exporte erstellt sowie heruntergeladen werden.
+Wenn eine Ollama-Generierung länger dauert, sind die hilfreichsten Logs meist:
+
+```bash
+docker compose logs -f backend ollama-default
+```
 
 ## Current Status
 

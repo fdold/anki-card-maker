@@ -1,4 +1,5 @@
 import json
+import logging
 
 from pydantic import BaseModel
 
@@ -51,7 +52,7 @@ def build_gateway(provider: SequenceProvider) -> ModelGateway:
     )
 
 
-def test_ollama_text_workflow_generates_traceable_cards() -> None:
+def test_ollama_text_workflow_generates_traceable_cards(caplog) -> None:
     provider = SequenceProvider(
         [
             json.dumps(
@@ -74,11 +75,12 @@ def test_ollama_text_workflow_generates_traceable_cards() -> None:
         models=build_gateway(provider),
     )
 
-    cards = plugin.generate_cards(
-        parsed,
-        OllamaTextWorkflowConfig(max_cards=5, max_blocks=1, max_cards_per_block=1),
-        context,
-    )
+    with caplog.at_level(logging.INFO):
+        cards = plugin.generate_cards(
+            parsed,
+            OllamaTextWorkflowConfig(max_cards=5, max_blocks=1, max_cards_per_block=1),
+            context,
+        )
 
     assert len(cards) == 1
     assert cards[0].workflow_plugin_id == plugin.manifest.plugin_id
@@ -87,6 +89,8 @@ def test_ollama_text_workflow_generates_traceable_cards() -> None:
     assert "ollama" in cards[0].tags
     assert "biology" in cards[0].tags
     assert provider.requests[0].response_schema is not None
+    assert "Starting Ollama workflow generation" in caplog.text
+    assert "Finished block generation" in caplog.text
 
 
 def test_ollama_text_workflow_applies_prompt_refinement() -> None:

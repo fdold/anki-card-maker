@@ -1,4 +1,5 @@
 import json
+import logging
 
 import httpx
 import pytest
@@ -26,14 +27,28 @@ def test_ollama_provider_maps_chat_payload_and_response_schema() -> None:
         observed_payload = json.loads(request.content.decode("utf-8"))
         return httpx.Response(
             200,
-            json={
-                "model": "qwen3:8b",
-                "message": {"role": "assistant", "content": '{"cards": []}'},
-                "done_reason": "stop",
-                "total_duration": 2_000_000,
-                "prompt_eval_count": 12,
-                "eval_count": 8,
-            },
+            text="\n".join(
+                [
+                    json.dumps(
+                        {
+                            "model": "qwen3:8b",
+                            "message": {"role": "assistant", "content": '{"cards": '},
+                            "done": False,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "model": "qwen3:8b",
+                            "message": {"role": "assistant", "content": "[]}"},
+                            "done": True,
+                            "done_reason": "stop",
+                            "total_duration": 2_000_000,
+                            "prompt_eval_count": 12,
+                            "eval_count": 8,
+                        }
+                    ),
+                ]
+            ),
         )
 
     provider = build_provider_with_transport(handler)
@@ -56,7 +71,7 @@ def test_ollama_provider_maps_chat_payload_and_response_schema() -> None:
     )
 
     assert observed_payload["model"] == "qwen3:8b"
-    assert observed_payload["stream"] is False
+    assert observed_payload["stream"] is True
     assert observed_payload["format"] == {"type": "object"}
     assert observed_payload["options"]["temperature"] == 0.1
     assert observed_payload["options"]["num_predict"] == 128
@@ -71,10 +86,13 @@ def test_ollama_provider_accepts_base_url_with_api_suffix() -> None:
         assert str(request.url) == "http://ollama-default:11434/api/chat"
         return httpx.Response(
             200,
-            json={
-                "model": "qwen3:8b",
-                "message": {"role": "assistant", "content": "ok"},
-            },
+            text=json.dumps(
+                {
+                    "model": "qwen3:8b",
+                    "message": {"role": "assistant", "content": "ok"},
+                    "done": True,
+                }
+            ),
         )
 
     provider = build_provider_with_transport(handler)
@@ -142,3 +160,37 @@ def test_ollama_provider_surfaces_ollama_error_body_for_missing_models() -> None
                 messages=[ModelMessage(role="user", content="Generate cards")],
             ),
         )
+
+
+def test_ollama_provider_emits_request_lifecycle_logs(caplog) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text=json.dumps(
+                {
+                    "model": "qwen3:8b",
+                    "message": {"role": "assistant", "content": "ok"},
+                    "done": True,
+                }
+            ),
+        )
+
+    provider = build_provider_with_transport(handler)
+
+    with caplog.at_level(logging.INFO):
+        provider.generate(
+            ModelProfile(
+                profile_id="ollama_generation_default",
+                provider="ollama",
+                model_name="qwen3:8b",
+                base_url="http://ollama-default:11434",
+            ),
+            ModelRequest(
+                profile_id="ollama_generation_default",
+                purpose="card_generation",
+                messages=[ModelMessage(role="user", content="Generate cards")],
+            ),
+        )
+
+    assert "Starting Ollama request" in caplog.text
+    assert "Completed Ollama request" in caplog.text

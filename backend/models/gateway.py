@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -19,6 +20,7 @@ from backend.models.providers.base import ModelProvider
 from backend.models.settings import ModelSettings
 
 StructuredModelT = TypeVar("StructuredModelT", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,13 @@ class ModelGateway:
             metadata=dict(metadata or {}),
         )
 
+        logger.info(
+            "Dispatching text model request profile=%s provider=%s purpose=%s metadata=%s",
+            profile.profile_id,
+            profile.provider,
+            purpose,
+            sorted(request.metadata.keys()),
+        )
         response, latency_ms = self._execute_provider(profile.provider, profile, request)
         invocation = ModelInvocationRecord(
             profile_id=profile.profile_id,
@@ -103,6 +112,14 @@ class ModelGateway:
             metadata=dict(metadata or {}),
         )
 
+        logger.info(
+            "Dispatching structured model request profile=%s provider=%s purpose=%s schema=%s metadata=%s",
+            profile.profile_id,
+            profile.provider,
+            purpose,
+            response_model.__name__,
+            sorted(request.metadata.keys()),
+        )
         response, latency_ms = self._execute_provider(profile.provider, profile, request)
 
         try:
@@ -119,6 +136,12 @@ class ModelGateway:
                 error_message=str(exc),
             )
             self._invocations.append(invocation)
+            logger.warning(
+                "Structured model response validation failed profile=%s purpose=%s error=%s",
+                profile.profile_id,
+                purpose,
+                str(exc),
+            )
             raise ModelResponseValidationError(
                 f"Model response for profile '{profile_id}' could not be validated."
             ) from exc
@@ -132,6 +155,12 @@ class ModelGateway:
             latency_ms=latency_ms,
         )
         self._invocations.append(invocation)
+        logger.info(
+            "Structured model request completed profile=%s purpose=%s latency_ms=%s",
+            profile.profile_id,
+            purpose,
+            latency_ms,
+        )
         return StructuredModelResult(
             parsed=parsed,
             response=response,
@@ -149,9 +178,16 @@ class ModelGateway:
             raise ValueError(f"Unsupported model provider: {provider_name}")
 
         started_at = time.perf_counter()
+        logger.info(
+            "Executing provider request provider=%s profile=%s model=%s purpose=%s",
+            provider_name,
+            profile.profile_id,
+            profile.model_name,
+            request.purpose,
+        )
         try:
             response = provider.generate(profile, request)
-        except ModelProviderError:
+        except ModelProviderError as exc:
             latency_ms = int((time.perf_counter() - started_at) * 1000)
             invocation = ModelInvocationRecord(
                 profile_id=profile.profile_id,
@@ -160,9 +196,17 @@ class ModelGateway:
                 purpose=request.purpose,
                 status="failed",
                 latency_ms=latency_ms,
-                error_message="Model provider request failed.",
+                error_message=str(exc),
             )
             self._invocations.append(invocation)
+            logger.warning(
+                "Provider request failed provider=%s profile=%s purpose=%s latency_ms=%s error=%s",
+                provider_name,
+                profile.profile_id,
+                request.purpose,
+                latency_ms,
+                str(exc),
+            )
             raise
         except Exception as exc:
             latency_ms = int((time.perf_counter() - started_at) * 1000)
@@ -176,6 +220,13 @@ class ModelGateway:
                 error_message=str(exc),
             )
             self._invocations.append(invocation)
+            logger.exception(
+                "Provider request failed unexpectedly provider=%s profile=%s purpose=%s latency_ms=%s",
+                provider_name,
+                profile.profile_id,
+                request.purpose,
+                latency_ms,
+            )
             raise ModelProviderError(
                 f"Model provider '{provider_name}' failed unexpectedly."
             ) from exc
@@ -184,4 +235,11 @@ class ModelGateway:
         if latency_ms is None:
             latency_ms = int((time.perf_counter() - started_at) * 1000)
             response = response.model_copy(update={"latency_ms": latency_ms})
+        logger.info(
+            "Provider request completed provider=%s profile=%s purpose=%s latency_ms=%s",
+            provider_name,
+            profile.profile_id,
+            request.purpose,
+            latency_ms,
+        )
         return response, latency_ms

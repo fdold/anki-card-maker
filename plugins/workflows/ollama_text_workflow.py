@@ -1,4 +1,5 @@
 import json
+import logging
 
 from pydantic import BaseModel, Field
 
@@ -14,6 +15,7 @@ from domain.models import (
 from plugins.base import WorkflowExecutionContext, WorkflowPlugin
 
 DEFAULT_GENERATION_TAGS = ["generated", "ollama", "txt"]
+logger = logging.getLogger(__name__)
 
 
 class OllamaTextWorkflowConfig(BaseModel):
@@ -69,14 +71,33 @@ class OllamaTextWorkflowPlugin(WorkflowPlugin[OllamaTextWorkflowConfig]):
     ) -> list[CardCandidate]:
         models = self._require_models(context)
         generated_cards: list[CardCandidate] = []
+        candidate_blocks = [
+            block for block in parsed_content.blocks[: config.max_blocks] if block.text.strip()
+        ]
 
-        for block in parsed_content.blocks[: config.max_blocks]:
-            if not block.text.strip():
-                continue
+        logger.info(
+            "Starting Ollama workflow generation run=%s document=%s blocks=%s max_cards=%s profile=%s",
+            context.run_id if context is not None else "unknown",
+            parsed_content.document.document_id,
+            len(candidate_blocks),
+            config.max_cards,
+            config.generator_model_profile,
+        )
+
+        for block_index, block in enumerate(candidate_blocks, start=1):
             remaining_cards = config.max_cards - len(generated_cards)
             if remaining_cards <= 0:
                 break
 
+            logger.info(
+                "Generating cards for run=%s block=%s/%s section=%s position=%s remaining_cards=%s",
+                context.run_id if context is not None else "unknown",
+                block_index,
+                len(candidate_blocks),
+                block.source.section,
+                block.source.position,
+                remaining_cards,
+            )
             result = models.generate_structured(
                 profile_id=config.generator_model_profile,
                 purpose="card_generation",
@@ -96,6 +117,7 @@ class OllamaTextWorkflowPlugin(WorkflowPlugin[OllamaTextWorkflowConfig]):
                 },
             )
 
+            block_generated_count = 0
             for generated_card in result.parsed.cards[: min(remaining_cards, config.max_cards_per_block)]:
                 front = generated_card.front.strip()
                 back = generated_card.back.strip()
@@ -110,7 +132,22 @@ class OllamaTextWorkflowPlugin(WorkflowPlugin[OllamaTextWorkflowConfig]):
                         workflow_plugin_id=self.manifest.plugin_id,
                     )
                 )
+                block_generated_count += 1
 
+            logger.info(
+                "Finished block generation run=%s block=%s/%s generated_cards=%s total_cards=%s",
+                context.run_id if context is not None else "unknown",
+                block_index,
+                len(candidate_blocks),
+                block_generated_count,
+                len(generated_cards),
+            )
+
+        logger.info(
+            "Completed Ollama workflow generation run=%s total_cards=%s",
+            context.run_id if context is not None else "unknown",
+            len(generated_cards),
+        )
         return generated_cards
 
     def apply_improvement(
@@ -124,6 +161,13 @@ class OllamaTextWorkflowPlugin(WorkflowPlugin[OllamaTextWorkflowConfig]):
         if not selected_cards:
             return []
 
+        logger.info(
+            "Starting Ollama workflow improvement run=%s card_count=%s profile=%s action=%s",
+            context.run_id if context is not None else "unknown",
+            len(request.cards),
+            config.improver_model_profile,
+            request.action_type,
+        )
         result = models.generate_structured(
             profile_id=config.improver_model_profile,
             purpose="card_improvement",
@@ -165,6 +209,11 @@ class OllamaTextWorkflowPlugin(WorkflowPlugin[OllamaTextWorkflowConfig]):
                 )
             )
 
+        logger.info(
+            "Completed Ollama workflow improvement run=%s refined_cards=%s",
+            context.run_id if context is not None else "unknown",
+            len(refined_cards),
+        )
         return refined_cards
 
     def _require_models(

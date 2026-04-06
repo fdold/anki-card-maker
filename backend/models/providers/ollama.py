@@ -1,3 +1,6 @@
+import json
+import logging
+import time
 from collections.abc import Callable
 
 import httpx
@@ -10,6 +13,9 @@ from backend.models.base import (
     ModelUsage,
 )
 from backend.models.providers.base import ModelProvider
+
+logger = logging.getLogger(__name__)
+STREAM_PROGRESS_LOG_INTERVAL_SECONDS = 10.0
 
 
 class OllamaProvider(ModelProvider):
@@ -28,7 +34,7 @@ class OllamaProvider(ModelProvider):
         payload = {
             "model": profile.model_name,
             "messages": [self._serialize_message(message) for message in request.messages],
-            "stream": False,
+            "stream": True,
         }
 
         options = self._serialize_options(request)
@@ -38,29 +44,36 @@ class OllamaProvider(ModelProvider):
         if request.response_schema is not None and profile.supports_structured_output:
             payload["format"] = request.response_schema
 
+        logger.info(
+            "Starting Ollama request profile=%s model=%s purpose=%s messages=%s structured=%s",
+            profile.profile_id,
+            profile.model_name,
+            request.purpose,
+            len(request.messages),
+            request.response_schema is not None,
+        )
+
         try:
             with self._client_factory(profile.timeout_seconds) as client:
-                http_response = client.post(endpoint, json=payload)
+                with client.stream("POST", endpoint, json=payload) as http_response:
+                    try:
+                        http_response.raise_for_status()
+                    except httpx.HTTPStatusError as exc:
+                        response_details = self._extract_error_details(http_response)
+                        raise ModelProviderError(
+                            "Ollama request failed for model "
+                            f"'{profile.model_name}' with status {http_response.status_code}: "
+                            f"{response_details}"
+                        ) from exc
+
+                    response_payload = self._read_streamed_response(
+                        http_response=http_response,
+                        model_name=profile.model_name,
+                        purpose=request.purpose,
+                    )
         except httpx.HTTPError as exc:
             raise ModelProviderError(
                 f"Ollama request failed for model '{profile.model_name}': {exc}."
-            ) from exc
-
-        try:
-            http_response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            response_details = self._extract_error_details(http_response)
-            raise ModelProviderError(
-                "Ollama request failed for model "
-                f"'{profile.model_name}' with status {http_response.status_code}: "
-                f"{response_details}"
-            ) from exc
-
-        try:
-            response_payload = http_response.json()
-        except ValueError as exc:
-            raise ModelProviderError(
-                f"Ollama returned a non-JSON response for model '{profile.model_name}'."
             ) from exc
 
         usage = self._extract_usage(response_payload)
@@ -69,6 +82,15 @@ class OllamaProvider(ModelProvider):
             raise ModelProviderError(
                 f"Ollama returned invalid content for model '{profile.model_name}'."
             )
+
+        logger.info(
+            "Completed Ollama request profile=%s model=%s purpose=%s output_chars=%s finish_reason=%s",
+            profile.profile_id,
+            profile.model_name,
+            request.purpose,
+            len(content),
+            response_payload.get("done_reason"),
+        )
 
         return ModelResponse(
             provider=profile.provider,
@@ -82,7 +104,13 @@ class OllamaProvider(ModelProvider):
 
     @staticmethod
     def _default_client_factory(timeout_seconds: float) -> httpx.Client:
-        return httpx.Client(timeout=timeout_seconds)
+        timeout = httpx.Timeout(
+            connect=timeout_seconds,
+            read=None,
+            write=timeout_seconds,
+            pool=timeout_seconds,
+        )
+        return httpx.Client(timeout=timeout)
 
     @staticmethod
     def _build_chat_endpoint(base_url: str) -> str:
@@ -159,3 +187,64 @@ class OllamaProvider(ModelProvider):
             return response_text
 
         return "No error details returned by Ollama."
+
+    @staticmethod
+    def _read_streamed_response(
+        *,
+        http_response: httpx.Response,
+        model_name: str,
+        purpose: str,
+    ) -> dict[str, object]:
+        content_parts: list[str] = []
+        accumulated_chars = 0
+        final_payload: dict[str, object] | None = None
+        last_progress_log_at = time.monotonic()
+
+        for line in http_response.iter_lines():
+            if not line:
+                continue
+
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ModelProviderError(
+                    f"Ollama returned invalid streamed JSON for model '{model_name}'."
+                ) from exc
+
+            if not isinstance(payload, dict):
+                continue
+
+            error_message = payload.get("error")
+            if isinstance(error_message, str) and error_message.strip():
+                raise ModelProviderError(
+                    f"Ollama request failed for model '{model_name}': {error_message.strip()}"
+                )
+
+            message = payload.get("message")
+            if isinstance(message, dict):
+                content_chunk = message.get("content")
+                if isinstance(content_chunk, str) and content_chunk:
+                    content_parts.append(content_chunk)
+                    accumulated_chars += len(content_chunk)
+
+            final_payload = payload
+            if time.monotonic() - last_progress_log_at >= STREAM_PROGRESS_LOG_INTERVAL_SECONDS:
+                logger.info(
+                    "Ollama response still streaming model=%s purpose=%s accumulated_chars=%s",
+                    model_name,
+                    purpose,
+                    accumulated_chars,
+                )
+                last_progress_log_at = time.monotonic()
+
+        if final_payload is None:
+            raise ModelProviderError(
+                f"Ollama returned an empty streamed response for model '{model_name}'."
+            )
+
+        final_message = final_payload.get("message")
+        if not isinstance(final_message, dict):
+            final_message = {}
+        final_message["content"] = "".join(content_parts)
+        final_payload["message"] = final_message
+        return final_payload
