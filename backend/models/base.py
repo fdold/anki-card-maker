@@ -42,6 +42,8 @@ class ModelProfile(BaseModel):
     provider: str = Field(..., min_length=1, description="Central provider identifier.")
     model_name: str = Field(..., min_length=1)
     base_url: str = Field(..., min_length=1)
+    host_base_url: str | None = None
+    prefer_host_if_available: bool = False
     timeout_seconds: float = Field(default=60.0, gt=0.0)
     default_options: ModelGenerationOptions = Field(
         default_factory=ModelGenerationOptions

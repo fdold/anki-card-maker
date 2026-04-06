@@ -194,3 +194,108 @@ def test_ollama_provider_emits_request_lifecycle_logs(caplog) -> None:
 
     assert "Starting Ollama request" in caplog.text
     assert "Completed Ollama request" in caplog.text
+
+
+def test_ollama_provider_uses_host_runtime_when_available() -> None:
+    observed_urls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed_urls.append(str(request.url))
+        if str(request.url) == "http://host.docker.internal:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+        if str(request.url) == "http://host.docker.internal:11434/api/chat":
+            return httpx.Response(
+                200,
+                text=json.dumps(
+                    {
+                        "model": "qwen3:8b",
+                        "message": {"role": "assistant", "content": "ok"},
+                        "done": True,
+                    }
+                ),
+            )
+        raise AssertionError(f"Unexpected request URL: {request.url}")
+
+    provider = build_provider_with_transport(handler)
+
+    provider.generate(
+        ModelProfile(
+            profile_id="ollama_generation_default",
+            provider="ollama",
+            model_name="qwen3:8b",
+            base_url="http://ollama-default:11434",
+            host_base_url="http://host.docker.internal:11434",
+            prefer_host_if_available=True,
+        ),
+        ModelRequest(
+            profile_id="ollama_generation_default",
+            purpose="card_generation",
+            messages=[ModelMessage(role="user", content="Generate cards")],
+        ),
+    )
+
+    assert observed_urls == [
+        "http://host.docker.internal:11434/api/tags",
+        "http://host.docker.internal:11434/api/chat",
+    ]
+
+
+def test_ollama_provider_rechecks_host_runtime_after_container_fallback() -> None:
+    observed_urls: list[str] = []
+    probe_results = iter([500, 200])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed_urls.append(str(request.url))
+        request_url = str(request.url)
+        if request_url == "http://host.docker.internal:11434/api/tags":
+            return httpx.Response(next(probe_results), json={"models": [{"name": "qwen3:8b"}]})
+        if request_url == "http://ollama-default:11434/api/chat":
+            return httpx.Response(
+                200,
+                text=json.dumps(
+                    {
+                        "model": "qwen3:8b",
+                        "message": {"role": "assistant", "content": "container"},
+                        "done": True,
+                    }
+                ),
+            )
+        if request_url == "http://host.docker.internal:11434/api/chat":
+            return httpx.Response(
+                200,
+                text=json.dumps(
+                    {
+                        "model": "qwen3:8b",
+                        "message": {"role": "assistant", "content": "host"},
+                        "done": True,
+                    }
+                ),
+            )
+        raise AssertionError(f"Unexpected request URL: {request.url}")
+
+    provider = build_provider_with_transport(handler)
+    profile = ModelProfile(
+        profile_id="ollama_generation_default",
+        provider="ollama",
+        model_name="qwen3:8b",
+        base_url="http://ollama-default:11434",
+        host_base_url="http://host.docker.internal:11434",
+        prefer_host_if_available=True,
+    )
+    request = ModelRequest(
+        profile_id="ollama_generation_default",
+        purpose="card_generation",
+        messages=[ModelMessage(role="user", content="Generate cards")],
+    )
+
+    first_response = provider.generate(profile, request)
+    second_response = provider.generate(profile, request)
+
+    assert first_response.content == "container"
+    assert second_response.content == "host"
+    assert observed_urls == [
+        "http://host.docker.internal:11434/api/tags",
+        "http://ollama-default:11434/api/chat",
+        "http://host.docker.internal:11434/api/tags",
+        "http://host.docker.internal:11434/api/chat",
+    ]

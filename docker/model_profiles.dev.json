@@ -4,6 +4,8 @@
     "provider": "ollama",
     "model_name": "qwen3:8b",
     "base_url": "http://ollama-default:11434",
+    "host_base_url": "http://host.docker.internal:11434",
+    "prefer_host_if_available": true,
     "timeout_seconds": 600,
     "supports_structured_output": true,
     "default_options": {
@@ -15,6 +17,8 @@
     "provider": "ollama",
     "model_name": "qwen3:8b",
     "base_url": "http://ollama-default:11434",
+    "host_base_url": "http://host.docker.internal:11434",
+    "prefer_host_if_available": true,
     "timeout_seconds": 600,
     "supports_structured_output": true,
     "default_options": {

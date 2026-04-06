@@ -5,25 +5,18 @@ from collections.abc import Callable
 
 import httpx
 
+from backend.models.ollama_runtime import normalize_ollama_base_url, resolve_ollama_base_url
 from backend.models.settings import MODEL_PROFILES_FILE_ENV, load_model_settings
 
 OLLAMA_INIT_BASE_URL_ENV = "OLLAMA_INIT_BASE_URL"
 OLLAMA_INIT_MAX_ATTEMPTS_ENV = "OLLAMA_INIT_MAX_ATTEMPTS"
 OLLAMA_INIT_DELAY_SECONDS_ENV = "OLLAMA_INIT_DELAY_SECONDS"
 PULL_PROGRESS_LOG_STEP = 5
-
-
-def normalize_ollama_base_url(base_url: str) -> str:
-    normalized = base_url.rstrip("/")
-    if normalized.endswith("/api"):
-        return normalized[:-4]
-    return normalized
-
-
 def resolve_models_for_base_url(
     *,
     profiles_file: str | None,
     target_base_url: str,
+    client: httpx.Client | None = None,
 ) -> list[str]:
     settings = load_model_settings(profiles_file=profiles_file)
     normalized_target = normalize_ollama_base_url(target_base_url)
@@ -32,7 +25,12 @@ def resolve_models_for_base_url(
     for profile in settings.profiles:
         if profile.provider != "ollama":
             continue
-        if normalize_ollama_base_url(profile.base_url) != normalized_target:
+        resolved_base_url = (
+            resolve_ollama_base_url(profile=profile, client=client)
+            if client is not None
+            else normalize_ollama_base_url(profile.base_url)
+        )
+        if resolved_base_url != normalized_target:
             continue
         if profile.model_name in resolved_models:
             continue
@@ -227,10 +225,6 @@ def main() -> None:
     target_base_url = os.environ.get(OLLAMA_INIT_BASE_URL_ENV, "http://ollama-default:11434")
     max_attempts = int(os.environ.get(OLLAMA_INIT_MAX_ATTEMPTS_ENV, "60"))
     delay_seconds = float(os.environ.get(OLLAMA_INIT_DELAY_SECONDS_ENV, "1"))
-    model_names = resolve_models_for_base_url(
-        profiles_file=profiles_file,
-        target_base_url=target_base_url,
-    )
 
     timeout = httpx.Timeout(connect=30.0, read=None, write=30.0, pool=30.0)
     with httpx.Client(timeout=timeout) as client:
@@ -239,6 +233,11 @@ def main() -> None:
             client=client,
             max_attempts=max_attempts,
             delay_seconds=delay_seconds,
+        )
+        model_names = resolve_models_for_base_url(
+            profiles_file=profiles_file,
+            target_base_url=target_base_url,
+            client=client,
         )
         ensure_models_present(
             base_url=target_base_url,

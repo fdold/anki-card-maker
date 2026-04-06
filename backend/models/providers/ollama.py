@@ -13,6 +13,7 @@ from backend.models.base import (
     ModelUsage,
 )
 from backend.models.providers.base import ModelProvider
+from backend.models.ollama_runtime import resolve_ollama_base_url
 
 logger = logging.getLogger(__name__)
 STREAM_PROGRESS_LOG_INTERVAL_SECONDS = 10.0
@@ -30,7 +31,6 @@ class OllamaProvider(ModelProvider):
         profile: ModelProfile,
         request: ModelRequest,
     ) -> ModelResponse:
-        endpoint = self._build_chat_endpoint(profile.base_url)
         payload = {
             "model": profile.model_name,
             "messages": [self._serialize_message(message) for message in request.messages],
@@ -53,8 +53,17 @@ class OllamaProvider(ModelProvider):
             request.response_schema is not None,
         )
 
+        response_payload: dict[str, object]
         try:
             with self._client_factory(profile.timeout_seconds) as client:
+                resolved_base_url = resolve_ollama_base_url(profile=profile, client=client)
+                endpoint = self._build_chat_endpoint(resolved_base_url)
+                logger.info(
+                    "Using Ollama endpoint profile=%s model=%s base_url=%s",
+                    profile.profile_id,
+                    profile.model_name,
+                    resolved_base_url,
+                )
                 with client.stream("POST", endpoint, json=payload) as http_response:
                     try:
                         http_response.raise_for_status()

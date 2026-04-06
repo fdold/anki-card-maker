@@ -30,12 +30,16 @@ def test_resolve_models_for_base_url_reads_unique_matching_models(tmp_path) -> N
                     "provider": "ollama",
                     "model_name": "qwen3:8b",
                     "base_url": "http://ollama-default:11434",
+                    "host_base_url": "http://host.docker.internal:11434",
+                    "prefer_host_if_available": True,
                 },
                 {
                     "profile_id": "improvement",
                     "provider": "ollama",
                     "model_name": "qwen3:8b",
                     "base_url": "http://ollama-default:11434/api",
+                    "host_base_url": "http://host.docker.internal:11434",
+                    "prefer_host_if_available": True,
                 },
                 {
                     "profile_id": "secondary",
@@ -54,6 +58,38 @@ def test_resolve_models_for_base_url_reads_unique_matching_models(tmp_path) -> N
     )
 
     assert models == ["qwen3:8b"]
+
+
+def test_resolve_models_for_base_url_skips_local_pull_when_host_runtime_is_available(tmp_path) -> None:
+    profiles_file = tmp_path / "profiles.json"
+    profiles_file.write_text(
+        json.dumps(
+            [
+                {
+                    "profile_id": "generation",
+                    "provider": "ollama",
+                    "model_name": "qwen3:8b",
+                    "base_url": "http://ollama-default:11434",
+                    "host_base_url": "http://host.docker.internal:11434",
+                    "prefer_host_if_available": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "http://host.docker.internal:11434/api/tags"
+        return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        models = resolve_models_for_base_url(
+            profiles_file=str(profiles_file),
+            target_base_url="http://ollama-default:11434",
+            client=client,
+        )
+
+    assert models == []
 
 
 def test_list_installed_models_reads_tags_response() -> None:

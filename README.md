@@ -28,6 +28,14 @@ Das Development-Backend liest seine Model-Profile aus
 `docker/model_profiles.dev.json`. Standardmaessig sind dort aktuell die Profile
 `ollama_generation_default` und `ollama_improvement_default` fuer
 `qwen3:8b` hinterlegt.
+Wenn innerhalb der Container ein nativer Ollama-Server auf dem Host unter
+`http://host.docker.internal:11434` erreichbar ist, wird dieser automatisch
+bevorzugt. Das ist vor allem fuer kompatible macOS-Setups mit nativem Ollama
+interessant, weil dort GPU-Beschleunigung moeglich ist. Wenn kein Host-Ollama
+erreichbar ist, faellt das System automatisch auf den Compose-Container
+`ollama-default` zurueck.
+Die Erkennung ist absichtlich probe-basiert: Das Backend prueft pro Anfrage
+kurz, ob der Host-Ollama wirklich antwortet, und bleibt sonst beim Container.
 Beim ersten Start kann dieser Schritt deutlich laenger dauern, weil das Modell
 zuerst heruntergeladen wird. Den Fortschritt kannst du bei Bedarf mitverfolgen:
 
@@ -178,6 +186,11 @@ Falls du pruefen willst, welche Modelle nach dem Init verfuegbar sind:
 ```bash
 docker compose exec ollama-default ollama list
 ```
+
+Wenn du auf einem kompatiblen Mac nativ installiertes Ollama verwenden willst,
+starte Ollama auf dem Host vor `docker compose up --build`. Die Backend-Logs
+zeigen dann an, dass fuer das jeweilige Profil `host.docker.internal` verwendet
+wird.
 
 Dann die CLI direkt im Frontend-Container verwenden:
 

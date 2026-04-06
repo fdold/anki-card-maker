@@ -15,6 +15,8 @@ def test_load_model_settings_supports_list_payload(tmp_path) -> None:
                     "provider": "ollama",
                     "model_name": "qwen3:8b",
                     "base_url": "http://ollama-default:11434",
+                    "host_base_url": "http://host.docker.internal:11434",
+                    "prefer_host_if_available": True,
                     "supports_structured_output": True,
                 }
             ]
@@ -26,6 +28,8 @@ def test_load_model_settings_supports_list_payload(tmp_path) -> None:
 
     assert len(settings.profiles) == 1
     assert settings.profiles[0].profile_id == "ollama_generation_default"
+    assert settings.profiles[0].host_base_url == "http://host.docker.internal:11434"
+    assert settings.profiles[0].prefer_host_if_available is True
 
 
 def test_load_model_settings_supports_env_path(tmp_path) -> None:
