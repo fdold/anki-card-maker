@@ -6,6 +6,7 @@ from backend.models.ollama_init import (
     ensure_models_present,
     list_installed_models,
     normalize_ollama_base_url,
+    pull_model,
     resolve_models_for_base_url,
 )
 
@@ -93,3 +94,33 @@ def test_ensure_models_present_only_pulls_missing_models() -> None:
         )
 
     assert observed_pulls == ["llama3.1:8b"]
+
+
+def test_pull_model_streams_progress_updates() -> None:
+    logged_messages: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "http://ollama-default:11434/api/pull"
+        assert json.loads(request.content.decode("utf-8")) == {"model": "qwen3:8b"}
+        return httpx.Response(
+            200,
+            text=(
+                '{"status":"pulling manifest"}\n'
+                '{"status":"pulling layers","completed":50,"total":100}\n'
+                '{"status":"pulling layers","completed":60,"total":100}\n'
+                '{"status":"success"}\n'
+            ),
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        pull_model(
+            base_url="http://ollama-default:11434",
+            model_name="qwen3:8b",
+            client=client,
+            logger=logged_messages.append,
+        )
+
+    assert logged_messages[0] == "Ollama pull 'qwen3:8b': pulling manifest"
+    assert "50.0%" in logged_messages[1]
+    assert "60.0%" in logged_messages[2]
+    assert logged_messages[-1] == "Ollama pull 'qwen3:8b': success"

@@ -26,7 +26,10 @@ services:
       PYTHONUNBUFFERED: "1"
       ANKI_CARD_MAKER_MODEL_PROFILES_FILE: "/app/docker/model_profiles.dev.json"
       OLLAMA_INIT_BASE_URL: "http://ollama-default:11434"
-    command: python -m backend.models.ollama_init
+    command:
+      - python
+      - -c
+      - from backend.models.ollama_init import main; main()
     restart: "no"
 
   backend:

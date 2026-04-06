@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from collections.abc import Callable
@@ -9,6 +10,7 @@ from backend.models.settings import MODEL_PROFILES_FILE_ENV, load_model_settings
 OLLAMA_INIT_BASE_URL_ENV = "OLLAMA_INIT_BASE_URL"
 OLLAMA_INIT_MAX_ATTEMPTS_ENV = "OLLAMA_INIT_MAX_ATTEMPTS"
 OLLAMA_INIT_DELAY_SECONDS_ENV = "OLLAMA_INIT_DELAY_SECONDS"
+PULL_PROGRESS_LOG_STEP = 5
 
 
 def normalize_ollama_base_url(base_url: str) -> str:
@@ -98,12 +100,61 @@ def pull_model(
     base_url: str,
     model_name: str,
     client: httpx.Client,
+    logger: Callable[[str], None] = print,
 ) -> None:
-    response = client.post(
-        f"{normalize_ollama_base_url(base_url)}/api/pull",
-        json={"model": model_name, "stream": False},
-    )
-    response.raise_for_status()
+    endpoint = f"{normalize_ollama_base_url(base_url)}/api/pull"
+    with client.stream(
+        "POST",
+        endpoint,
+        json={"model": model_name},
+    ) as response:
+        response.raise_for_status()
+
+        last_status: str | None = None
+        last_progress_bucket = -1
+
+        for line in response.iter_lines():
+            if not line:
+                continue
+
+            payload = json.loads(line)
+            if not isinstance(payload, dict):
+                continue
+
+            error_message = payload.get("error")
+            if isinstance(error_message, str) and error_message.strip():
+                raise RuntimeError(
+                    f"Ollama reported a pull error for '{model_name}': {error_message.strip()}"
+                )
+
+            status = payload.get("status")
+            completed = payload.get("completed")
+            total = payload.get("total")
+
+            if not isinstance(status, str) or not status.strip():
+                continue
+
+            normalized_status = status.strip()
+            progress_bucket = _get_progress_bucket(completed, total)
+            should_log = False
+            if normalized_status != last_status:
+                should_log = True
+            elif progress_bucket is not None and progress_bucket > last_progress_bucket:
+                should_log = True
+
+            if should_log:
+                logger(
+                    _format_pull_status_message(
+                        model_name=model_name,
+                        status=normalized_status,
+                        completed=completed,
+                        total=total,
+                    )
+                )
+
+            last_status = normalized_status
+            if progress_bucket is not None:
+                last_progress_bucket = progress_bucket
 
 
 def ensure_models_present(
@@ -128,8 +179,47 @@ def ensure_models_present(
             continue
 
         logger(f"Pulling Ollama model '{model_name}'...")
-        pull_model(base_url=base_url, model_name=model_name, client=client)
+        pull_model(
+            base_url=base_url,
+            model_name=model_name,
+            client=client,
+            logger=logger,
+        )
         logger(f"Finished pulling Ollama model '{model_name}'.")
+
+
+def _get_progress_bucket(completed: object, total: object) -> int | None:
+    if not isinstance(completed, int) or not isinstance(total, int) or total <= 0:
+        return None
+    percentage = (completed / total) * 100
+    return int(percentage // PULL_PROGRESS_LOG_STEP)
+
+
+def _format_pull_status_message(
+    *,
+    model_name: str,
+    status: str,
+    completed: object,
+    total: object,
+) -> str:
+    if isinstance(completed, int) and isinstance(total, int) and total > 0:
+        percentage = min((completed / total) * 100, 100.0)
+        return (
+            f"Ollama pull '{model_name}': {status} "
+            f"({percentage:.1f}%, {_format_bytes(completed)} / {_format_bytes(total)})"
+        )
+    return f"Ollama pull '{model_name}': {status}"
+
+
+def _format_bytes(num_bytes: int) -> str:
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    value = float(num_bytes)
+    for unit in units:
+        if value < 1024.0 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024.0
 
 
 def main() -> None:
@@ -142,7 +232,8 @@ def main() -> None:
         target_base_url=target_base_url,
     )
 
-    with httpx.Client(timeout=300.0) as client:
+    timeout = httpx.Timeout(connect=30.0, read=None, write=30.0, pool=30.0)
+    with httpx.Client(timeout=timeout) as client:
         wait_for_ollama(
             base_url=target_base_url,
             client=client,

@@ -35,6 +35,9 @@ zuerst heruntergeladen wird. Den Fortschritt kannst du bei Bedarf mitverfolgen:
 docker compose logs -f ollama-init
 ```
 
+Der `ollama-init`-Service gibt dabei Status- und Fortschrittszeilen aus, waehrend
+das Modell geladen wird.
+
 Web-UI im Browser:
 
 ```bash
