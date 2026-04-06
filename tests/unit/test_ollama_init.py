@@ -79,8 +79,10 @@ def test_resolve_models_for_base_url_skips_local_pull_when_host_runtime_is_avail
     )
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert str(request.url) == "http://host.docker.internal:11434/api/tags"
-        return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+        request_url = str(request.url)
+        if request_url == "http://host.docker.internal:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+        raise AssertionError(f"Unexpected request URL: {request.url}")
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         models = resolve_models_for_base_url(
@@ -90,6 +92,42 @@ def test_resolve_models_for_base_url_skips_local_pull_when_host_runtime_is_avail
         )
 
     assert models == []
+
+
+def test_resolve_models_for_base_url_keeps_local_pull_when_host_model_is_missing(tmp_path) -> None:
+    profiles_file = tmp_path / "profiles.json"
+    profiles_file.write_text(
+        json.dumps(
+            [
+                {
+                    "profile_id": "generation",
+                    "provider": "ollama",
+                    "model_name": "qwen3:8b",
+                    "base_url": "http://ollama-default:11434",
+                    "host_base_url": "http://host.docker.internal:11434",
+                    "prefer_host_if_available": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        request_url = str(request.url)
+        if request_url == "http://host.docker.internal:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "llama3.2:3b"}]})
+        if request_url == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": []})
+        raise AssertionError(f"Unexpected request URL: {request.url}")
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        models = resolve_models_for_base_url(
+            profiles_file=str(profiles_file),
+            target_base_url="http://ollama-default:11434",
+            client=client,
+        )
+
+    assert models == ["qwen3:8b"]
 
 
 def test_list_installed_models_reads_tags_response() -> None:

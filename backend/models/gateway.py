@@ -44,6 +44,24 @@ class ModelGateway:
     def list_profiles(self) -> list[ModelProfile]:
         return list(self._settings.profiles)
 
+    def list_runtime_statuses(self) -> list[dict[str, object]]:
+        runtime_statuses: list[dict[str, object]] = []
+        for profile in self._settings.profiles:
+            provider = self._providers.get(profile.provider)
+            if provider is None:
+                runtime_statuses.append(
+                    {
+                        "profile_id": profile.profile_id,
+                        "provider": profile.provider,
+                        "model_name": profile.model_name,
+                        "status": "unavailable",
+                        "message": f"Unsupported model provider: {profile.provider}",
+                    }
+                )
+                continue
+            runtime_statuses.append(provider.describe_runtime(profile))
+        return runtime_statuses
+
     def get_profile(self, profile_id: str) -> ModelProfile:
         return self._settings.get_profile(profile_id)
 

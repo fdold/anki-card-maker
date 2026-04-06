@@ -23,6 +23,8 @@ def test_ollama_provider_maps_chat_payload_and_response_schema() -> None:
     observed_payload: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
         nonlocal observed_payload
         observed_payload = json.loads(request.content.decode("utf-8"))
         return httpx.Response(
@@ -83,6 +85,8 @@ def test_ollama_provider_maps_chat_payload_and_response_schema() -> None:
 
 def test_ollama_provider_accepts_base_url_with_api_suffix() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
         assert str(request.url) == "http://ollama-default:11434/api/chat"
         return httpx.Response(
             200,
@@ -114,6 +118,8 @@ def test_ollama_provider_accepts_base_url_with_api_suffix() -> None:
 
 def test_ollama_provider_wraps_transport_errors() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
         return httpx.Response(500, json={"error": "boom"})
 
     provider = build_provider_with_transport(handler)
@@ -136,6 +142,8 @@ def test_ollama_provider_wraps_transport_errors() -> None:
 
 def test_ollama_provider_surfaces_ollama_error_body_for_missing_models() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
         return httpx.Response(
             404,
             json={"error": "model 'qwen3:8b' not found, try pulling it first"},
@@ -164,6 +172,8 @@ def test_ollama_provider_surfaces_ollama_error_body_for_missing_models() -> None
 
 def test_ollama_provider_emits_request_lifecycle_logs(caplog) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
         return httpx.Response(
             200,
             text=json.dumps(
@@ -201,9 +211,12 @@ def test_ollama_provider_uses_host_runtime_when_available() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         observed_urls.append(str(request.url))
-        if str(request.url) == "http://host.docker.internal:11434/api/tags":
+        request_url = str(request.url)
+        if request_url == "http://host.docker.internal:11434/api/tags":
             return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
-        if str(request.url) == "http://host.docker.internal:11434/api/chat":
+        if request_url == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+        if request_url == "http://host.docker.internal:11434/api/chat":
             return httpx.Response(
                 200,
                 text=json.dumps(
@@ -248,7 +261,12 @@ def test_ollama_provider_rechecks_host_runtime_after_container_fallback() -> Non
         observed_urls.append(str(request.url))
         request_url = str(request.url)
         if request_url == "http://host.docker.internal:11434/api/tags":
-            return httpx.Response(next(probe_results), json={"models": [{"name": "qwen3:8b"}]})
+            status_code = next(probe_results)
+            if status_code == 200:
+                return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+            return httpx.Response(status_code, json={"error": "not available"})
+        if request_url == "http://ollama-default:11434/api/tags":
+            return httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
         if request_url == "http://ollama-default:11434/api/chat":
             return httpx.Response(
                 200,
@@ -295,7 +313,32 @@ def test_ollama_provider_rechecks_host_runtime_after_container_fallback() -> Non
     assert second_response.content == "host"
     assert observed_urls == [
         "http://host.docker.internal:11434/api/tags",
+        "http://ollama-default:11434/api/tags",
         "http://ollama-default:11434/api/chat",
         "http://host.docker.internal:11434/api/tags",
         "http://host.docker.internal:11434/api/chat",
     ]
+
+
+def test_ollama_provider_fails_fast_when_no_runtime_is_reachable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "not available"})
+
+    provider = build_provider_with_transport(handler)
+
+    with pytest.raises(ModelProviderError, match="No Ollama runtime is reachable"):
+        provider.generate(
+            ModelProfile(
+                profile_id="ollama_generation_default",
+                provider="ollama",
+                model_name="qwen3:8b",
+                base_url="http://ollama-default:11434",
+                host_base_url="http://host.docker.internal:11434",
+                prefer_host_if_available=True,
+            ),
+            ModelRequest(
+                profile_id="ollama_generation_default",
+                purpose="card_generation",
+                messages=[ModelMessage(role="user", content="Generate cards")],
+            ),
+        )

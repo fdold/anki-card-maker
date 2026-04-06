@@ -25,7 +25,11 @@ from backend.models.ollama_init import (
 )
 from backend.models.ollama_runtime import (
     DEFAULT_OLLAMA_PROBE_TIMEOUT_SECONDS,
+    OllamaEndpointStatus,
+    OllamaRuntimeStatus,
+    describe_ollama_runtime,
     is_ollama_available,
+    probe_ollama_endpoint,
     resolve_ollama_base_url,
 )
 from backend.models.providers import ModelProvider, OllamaProvider
@@ -59,11 +63,14 @@ __all__ = [
     "ModelResponse",
     "ModelResponseValidationError",
     "ModelSettings",
+    "OllamaEndpointStatus",
     "OllamaProvider",
+    "OllamaRuntimeStatus",
     "ModelUsage",
     "StructuredModelResult",
     "build_model_gateway",
     "build_provider_registry",
+    "describe_ollama_runtime",
     "ensure_models_present",
     "get_model_profile",
     "list_installed_models",
@@ -71,6 +78,7 @@ __all__ = [
     "load_model_settings",
     "normalize_ollama_base_url",
     "is_ollama_available",
+    "probe_ollama_endpoint",
     "resolve_models_for_base_url",
     "resolve_ollama_base_url",
     "wait_for_ollama",

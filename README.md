@@ -14,15 +14,24 @@ Modular Python application for turning documents into Anki-compatible flashcards
 
 ## Quick Start
 
+Host-Modus auf einem kompatiblen Rechner mit nativem Ollama:
+
 ```bash
 docker compose up --build
 ```
 
+Lokaler Ollama-Container als Fallback oder fuer reine Docker-Setups:
+
+```bash
+docker compose --profile local-ollama up --build
+```
+
 Danach stehen Backend und eine Web-UI direkt bereit.
-Ollama wird im Compose-Setup nun in einem eigenen Container gestartet.
-Ein einmaliger Init-Service zieht beim Compose-Start automatisch alle in
+Im Host-Modus startet kein lokaler Ollama-Container mehr.
+Im lokalen Compose-Profil wird Ollama in einem eigenen Container gestartet.
+Ein einmaliger Init-Service zieht dabei automatisch alle in
 `docker/model_profiles.dev.json` konfigurierten Ollama-Modelle fuer
-`ollama-default`, bevor das Backend startet.
+`ollama-default`.
 
 Das Development-Backend liest seine Model-Profile aus
 `docker/model_profiles.dev.json`. Standardmaessig sind dort aktuell die Profile
@@ -32,19 +41,21 @@ Wenn innerhalb der Container ein nativer Ollama-Server auf dem Host unter
 `http://host.docker.internal:11434` erreichbar ist, wird dieser automatisch
 bevorzugt. Das ist vor allem fuer kompatible macOS-Setups mit nativem Ollama
 interessant, weil dort GPU-Beschleunigung moeglich ist. Wenn kein Host-Ollama
-erreichbar ist, faellt das System automatisch auf den Compose-Container
-`ollama-default` zurueck.
+mit passendem Modell erreichbar ist, faellt das System automatisch auf den
+Compose-Container `ollama-default` zurueck, sofern dieser mit dem Profil
+`local-ollama` gestartet wurde.
 Die Erkennung ist absichtlich probe-basiert: Das Backend prueft pro Anfrage
-kurz, ob der Host-Ollama wirklich antwortet, und bleibt sonst beim Container.
+kurz, ob der Host-Ollama wirklich antwortet und ob das benoetigte Modell dort
+vorhanden ist.
 Beim ersten Start kann dieser Schritt deutlich laenger dauern, weil das Modell
 zuerst heruntergeladen wird. Den Fortschritt kannst du bei Bedarf mitverfolgen:
 
 ```bash
-docker compose logs -f ollama-init
+docker compose --profile local-ollama logs -f ollama-init
 ```
 
-Der `ollama-init`-Service gibt dabei Status- und Fortschrittszeilen aus, waehrend
-das Modell geladen wird.
+Der `ollama-init`-Service gibt dabei Status- und Fortschrittszeilen aus,
+waehrend das Modell geladen wird.
 Während längerer Ollama-Generierungen loggen Backend und Workflow jetzt zudem
 den Start der Anfrage, den aktuellen Dokument-/Block-Status und den Abschluss
 der Modellantwort.
@@ -167,21 +178,34 @@ API-Endpunkte:
 - `GET /exports/{export_id}/download`
 
 Der Endpoint `GET /overview` zeigt jetzt auch die geladenen
-`available_model_profiles`, sofern das Backend mit einer Model-Profile-Datei
-konfiguriert wurde.
+`available_model_profiles` sowie `model_runtime_statuses`, sofern das Backend
+mit einer Model-Profile-Datei konfiguriert wurde.
 
 ## Docker Test Flow
 
 Beispieltexte liegen in `test-data/samples/`.
 CSV-Exporte kannst du in `test-data/exports/` ablegen.
 
-Alles starten:
+Host-Modus starten:
 
 ```bash
 docker compose up --build
 ```
 
-Falls du pruefen willst, welche Modelle nach dem Init verfuegbar sind:
+Lokalen Ollama-Container starten:
+
+```bash
+docker compose --profile local-ollama up --build
+```
+
+Falls du versehentlich noch einen alten lokalen Ollama-Container aus einem
+frueheren Start laufen hast, kannst du ihn gezielt anhalten:
+
+```bash
+docker compose stop ollama-default ollama-init
+```
+
+Falls du pruefen willst, welche Modelle nach dem lokalen Init verfuegbar sind:
 
 ```bash
 docker compose exec ollama-default ollama list
@@ -190,7 +214,7 @@ docker compose exec ollama-default ollama list
 Wenn du auf einem kompatiblen Mac nativ installiertes Ollama verwenden willst,
 starte Ollama auf dem Host vor `docker compose up --build`. Die Backend-Logs
 zeigen dann an, dass fuer das jeweilige Profil `host.docker.internal` verwendet
-wird.
+wird. In der Web-UI erscheint derselbe Status auch in der Overview.
 
 Dann die CLI direkt im Frontend-Container verwenden:
 
@@ -219,7 +243,13 @@ Dort koennen Dokumente hochgeladen, Runs erzeugt, Improvements angewendet und CS
 Wenn eine Ollama-Generierung länger dauert, sind die hilfreichsten Logs meist:
 
 ```bash
-docker compose logs -f backend ollama-default
+docker compose logs -f backend
+```
+
+Im lokalen Container-Modus zusaetzlich:
+
+```bash
+docker compose --profile local-ollama logs -f ollama-default ollama-init
 ```
 
 ## Current Status

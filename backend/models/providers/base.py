@@ -14,3 +14,11 @@ class ModelProvider(ABC):
 
     def healthcheck(self, profile: ModelProfile) -> bool:
         return True
+
+    def describe_runtime(self, profile: ModelProfile) -> dict[str, object]:
+        return {
+            "profile_id": profile.profile_id,
+            "provider": profile.provider,
+            "model_name": profile.model_name,
+            "status": "unknown",
+        }

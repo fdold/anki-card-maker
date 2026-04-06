@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 import httpx
 
-from backend.models.ollama_runtime import normalize_ollama_base_url, resolve_ollama_base_url
+from backend.models.ollama_runtime import describe_ollama_runtime, normalize_ollama_base_url
 from backend.models.settings import MODEL_PROFILES_FILE_ENV, load_model_settings
 
 OLLAMA_INIT_BASE_URL_ENV = "OLLAMA_INIT_BASE_URL"
@@ -25,11 +25,15 @@ def resolve_models_for_base_url(
     for profile in settings.profiles:
         if profile.provider != "ollama":
             continue
-        resolved_base_url = (
-            resolve_ollama_base_url(profile=profile, client=client)
-            if client is not None
-            else normalize_ollama_base_url(profile.base_url)
-        )
+        if client is not None:
+            runtime_status = describe_ollama_runtime(profile=profile, client=client)
+            resolved_base_url = (
+                runtime_status.selected_base_url
+                if runtime_status.status == "ready"
+                else normalize_ollama_base_url(profile.base_url)
+            )
+        else:
+            resolved_base_url = normalize_ollama_base_url(profile.base_url)
         if resolved_base_url != normalized_target:
             continue
         if profile.model_name in resolved_models:

@@ -175,6 +175,7 @@ def create_app() -> FastAPI:
     run_repository = InMemoryRunRepository()
     export_repository = InMemoryExportRepository()
     model_gateway = build_model_gateway()
+    app.state.model_gateway = model_gateway
     app.state.document_service = DocumentService(document_repository=document_repository)
     app.state.run_service = RunService(
         document_repository=document_repository,
@@ -190,6 +191,20 @@ def create_app() -> FastAPI:
         export_repository=export_repository,
         document_repository=document_repository,
     )
+    runtime_statuses = model_gateway.list_runtime_statuses()
+    if runtime_statuses:
+        for runtime_status in runtime_statuses:
+            logger.info(
+                "Model runtime status profile=%s provider=%s status=%s selected_runtime=%s selected_base_url=%s message=%s",
+                runtime_status.get("profile_id"),
+                runtime_status.get("provider"),
+                runtime_status.get("status"),
+                runtime_status.get("selected_runtime"),
+                runtime_status.get("selected_base_url"),
+                runtime_status.get("message"),
+            )
+    else:
+        logger.info("No model profiles configured at backend startup.")
 
     @app.get("/health")
     def healthcheck() -> dict[str, str]:
@@ -197,7 +212,7 @@ def create_app() -> FastAPI:
 
     @app.get("/overview")
     def overview() -> dict[str, object]:
-        return create_application_overview()
+        return create_application_overview(model_gateway=app.state.model_gateway)
 
     @app.post(
         "/documents",

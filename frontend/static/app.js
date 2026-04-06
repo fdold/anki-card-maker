@@ -391,6 +391,28 @@ function renderOverview() {
     )
     .join("");
 
+  const runtimeStatuses = (state.overview.model_runtime_statuses || [])
+    .map(
+      (runtimeStatus) => {
+        const hostSummary = runtimeStatus.host_base_url
+          ? `${runtimeStatus.host_reachable ? "reachable" : "unreachable"} · model ${runtimeStatus.host_model_available ? "ready" : "missing"}`
+          : "not configured";
+        const containerSummary = `${runtimeStatus.container_reachable ? "reachable" : "unreachable"} · model ${runtimeStatus.container_model_available ? "ready" : "missing"}`;
+        return `
+        <div class="overview-card">
+          <p class="eyebrow">Model Runtime</p>
+          <strong>${escapeHtml(runtimeStatus.profile_id || runtimeStatus.model_name || "unknown")}</strong>
+          <p><strong>Status:</strong> ${escapeHtml(runtimeStatus.status || "unknown")}</p>
+          <p><strong>Selected:</strong> ${escapeHtml(runtimeStatus.selected_runtime || "n/a")} · ${escapeHtml(runtimeStatus.selected_base_url || "n/a")}</p>
+          <p><strong>Host:</strong> ${escapeHtml(hostSummary)}</p>
+          <p><strong>Container:</strong> ${escapeHtml(containerSummary)}</p>
+          <p>${escapeHtml(runtimeStatus.message || "")}</p>
+        </div>
+      `;
+      }
+    )
+    .join("");
+
   elements.overviewContent.innerHTML = `
     <div class="overview-card">
       <p class="eyebrow">Input Formats</p>
@@ -401,6 +423,7 @@ function renderOverview() {
       <strong>${escapeHtml((state.overview.api_resources || []).length.toString())}</strong>
       <p>${escapeHtml((state.overview.api_resources || []).join(", "))}</p>
     </div>
+    ${runtimeStatuses}
     ${workflows}
     ${exporters}
   `;
