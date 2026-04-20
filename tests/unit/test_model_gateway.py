@@ -60,7 +60,7 @@ def test_model_gateway_merges_profile_defaults_with_request_options() -> None:
     gateway = build_gateway(provider)
 
     gateway.generate_text(
-        profile_id="ollama_generation_default",
+        profile_id="_default",
         purpose="card_generation",
         messages=[ModelMessage(role="user", content="Generate cards")],
         options=ModelGenerationOptions(max_output_tokens=256),
