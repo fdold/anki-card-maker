@@ -1,7 +1,7 @@
 # Requirements
 
 Prompt classification for this initialization: new requirement, project context only.
-Prompt classification for the latest update: new architectural requirements for LangGraph-backed workflow plugin execution.
+Prompt classification for the latest update: new documentation requirement for a dedicated interface contract reference.
 
 Sources reviewed:
 - `prompt-001`: User request to initialize a requirements file for the current project.
@@ -21,6 +21,7 @@ Sources reviewed:
 - `prompt-006`: User request that the web interface can be designed in Figma to allow simple prototyping.
 - `prompt-007`: User request to add additional requirements for effective tests.
 - `prompt-008`: User request to create requirements that allow a smooth LangGraph integration for dynamic workflow plugins, model orchestration, feature extraction, user interaction, and external model integration.
+- `prompt-009`: User request to create `docs/INTERFACES.md` defining all API interfaces as a reference for future changes and test validation.
 - `langgraph-doc-001`: LangGraph overview documentation describing LangGraph as a low-level orchestration framework and runtime for long-running, stateful workflows with durable execution, streaming, and human-in-the-loop support.
 - `langgraph-doc-002`: LangGraph durable execution documentation describing checkpointed pause, resume, recovery, and deterministic/idempotent workflow design.
 - `langgraph-doc-003`: LangGraph interrupt reference describing resumable graph interruptions for human-in-the-loop workflows.
@@ -1480,6 +1481,24 @@ source:
     confidence: high
   - kind: prompt
     ref: prompt-003
+    confidence: high
+tests: []
+conflicts_with: []
+```
+
+## REQ-DOC-001
+
+```yaml
+id: REQ-DOC-001
+status: active
+type: interface
+parent: null
+children: []
+statement: The project SHALL maintain `docs/INTERFACES.md` as the dedicated reference for API, plugin, runtime, storage, exporter, frontend, and external integration interface contracts used by implementation changes and test validation.
+rationale: A single interface contract reference keeps future changes and tests aligned with the canonical requirements.
+source:
+  - kind: prompt
+    ref: prompt-009
     confidence: high
 tests: []
 conflicts_with: []
